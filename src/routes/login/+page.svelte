@@ -17,7 +17,7 @@
             await new Promise(resolve => setTimeout(resolve, 1000));
 
             // Redirect to dashboard after successful login
-            window.location.href = "/dashboard";
+            window.location.href = "/app";
         } catch (error) {
             errorMessage = "Google authentication failed. Please try again.";
             console.error("Login error:", error);
