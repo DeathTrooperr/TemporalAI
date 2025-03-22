@@ -1,331 +1,398 @@
 <script lang="ts">
-    import { fade, scale } from "svelte/transition";
-    import { onMount } from "svelte";
 
-    // State variables
-    let currentDate: Date = new Date();
-    let monthDropdownOpen = false;
-    let mobileMenuOpen = false;
+    // Type definitions
+    type CalendarViewType = 'month' | 'week' | 'day';
 
-    const months = [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December"
-    ];
-
-    // Define a simple event type (now with a unique id) and some dummy events
-    type Event = {
+    interface CalendarEvent {
         id: number;
         title: string;
-        date: string; // in YYYY-MM-DD format
-        time?: string;
-    };
+        start: Date;
+        end: Date;
+        color: string;
+    }
 
-    let events: Event[] = [
-        { id: 1, title: "Design review", date: "2022-01-03", time: "10:00" },
-        { id: 2, title: "Sales meeting", date: "2022-01-03", time: "14:00" },
-        { id: 3, title: "Date night", date: "2022-01-07", time: "18:00" },
-        { id: 4, title: "Sam's birthday party", date: "2022-01-12", time: "14:00" },
-        { id: 5, title: "Maple syrup museum", date: "2022-01-22", time: "15:00" },
-        { id: 6, title: "Hockey game", date: "2022-01-22", time: "19:00" },
-        { id: 7, title: "Cinema with friends", date: "2022-02-04", time: "21:00" }
+    // Calendar state
+    let currentView: CalendarViewType = 'month';
+    let currentDate = new Date();
+    let currentMonth = currentDate.getMonth();
+    let currentYear = currentDate.getFullYear();
+    let selectedDate = new Date();
+
+    // Example events - in a real app, these would come from an API or store
+    let events: CalendarEvent[] = [
+        {
+            id: 1,
+            title: 'Team Meeting',
+            start: new Date(currentYear, currentMonth, 5, 10, 0),
+            end: new Date(currentYear, currentMonth, 5, 11, 30),
+            color: 'blue'
+        },
+        {
+            id: 2,
+            title: 'Product Demo',
+            start: new Date(currentYear, currentMonth, 12, 14, 0),
+            end: new Date(currentYear, currentMonth, 12, 15, 0),
+            color: 'purple'
+        },
+        {
+            id: 3,
+            title: 'Client Call',
+            start: new Date(currentYear, currentMonth, 18, 9, 0),
+            end: new Date(currentYear, currentMonth, 18, 10, 0),
+            color: 'green'
+        }
     ];
 
-    // Define a type for each calendar cell
-    type Day = {
-        date: Date;
-        isCurrentMonth: boolean;
-        events: Event[];
-    };
+    // Calendar functions
+    function getDaysInMonth(year: number, month: number): number {
+        return new Date(year, month + 1, 0).getDate();
+    }
 
-    let calendar: Day[] = [];
+    function getFirstDayOfMonth(year: number, month: number): number {
+        return new Date(year, month, 1).getDay();
+    }
 
-    // Generate a 6-week grid of days (42 days) for the current month view.
-    function generateCalendar(date: Date) {
-        calendar = [];
-        const year = date.getFullYear();
-        const month = date.getMonth();
-        const firstDayOfMonth = new Date(year, month, 1);
-        // Using the JS getDay() value (0 = Sunday, 6 = Saturday)
-        const startDay = firstDayOfMonth.getDay();
-        // Calculate the starting date for the grid (may be from the previous month)
-        const startDate = new Date(firstDayOfMonth);
-        startDate.setDate(firstDayOfMonth.getDate() - startDay);
-
-        // Fill 42 days (6 rows * 7 days)
-        for (let i = 0; i < 42; i++) {
-            const dayDate = new Date(startDate);
-            dayDate.setDate(startDate.getDate() + i);
-            // Match events by comparing the date string in ISO format (YYYY-MM-DD)
-            const dayStr = dayDate.toISOString().split("T")[0];
-            const dayEvents = events.filter((e) => e.date === dayStr);
-            calendar.push({
-                date: dayDate,
-                isCurrentMonth: dayDate.getMonth() === month,
-                events: dayEvents
-            });
+    function getPreviousMonth(): void {
+        if (currentMonth === 0) {
+            currentMonth = 11;
+            currentYear--;
+        } else {
+            currentMonth--;
         }
+        currentDate = new Date(currentYear, currentMonth, 1);
     }
 
-    // Regenerate the calendar whenever currentDate changes.
-    $: generateCalendar(currentDate);
+    function getNextMonth(): void {
+        if (currentMonth === 11) {
+            currentMonth = 0;
+            currentYear++;
+        } else {
+            currentMonth++;
+        }
+        currentDate = new Date(currentYear, currentMonth, 1);
+    }
 
-    function previousMonth() {
-        currentDate = new Date(
-            currentDate.getFullYear(),
-            currentDate.getMonth() - 1,
-            1
+    function getPreviousWeek(): void {
+        const newDate = new Date(currentDate);
+        newDate.setDate(newDate.getDate() - 7);
+        currentDate = newDate;
+        currentMonth = currentDate.getMonth();
+        currentYear = currentDate.getFullYear();
+    }
+
+    function getNextWeek(): void {
+        const newDate = new Date(currentDate);
+        newDate.setDate(newDate.getDate() + 7);
+        currentDate = newDate;
+        currentMonth = currentDate.getMonth();
+        currentYear = currentDate.getFullYear();
+    }
+
+    function getPreviousDay(): void {
+        const newDate = new Date(currentDate);
+        newDate.setDate(newDate.getDate() - 1);
+        currentDate = newDate;
+        currentMonth = currentDate.getMonth();
+        currentYear = currentDate.getFullYear();
+    }
+
+    function getNextDay(): void {
+        const newDate = new Date(currentDate);
+        newDate.setDate(newDate.getDate() + 1);
+        currentDate = newDate;
+        currentMonth = currentDate.getMonth();
+        currentYear = currentDate.getFullYear();
+    }
+
+    function changeView(view: CalendarViewType): void {
+        currentView = view;
+    }
+
+    function selectDate(day: number): void {
+        selectedDate = new Date(currentYear, currentMonth, day);
+        // In a real app, you might want to switch to day view when selecting a date
+        // currentView = 'day';
+    }
+
+    function getMonthName(month: number): string {
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'];
+        return monthNames[month];
+    }
+
+    function getDayName(dayIndex: number): string {
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        return dayNames[dayIndex];
+    }
+
+    function getEventsForDate(date: Date): CalendarEvent[] {
+        return events.filter(event =>
+            event.start.getDate() === date.getDate() &&
+            event.start.getMonth() === date.getMonth() &&
+            event.start.getFullYear() === date.getFullYear()
         );
     }
 
-    function nextMonth() {
-        currentDate = new Date(
-            currentDate.getFullYear(),
-            currentDate.getMonth() + 1,
-            1
-        );
+    function formatTime(date: Date): string {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
-    function goToToday() {
-        currentDate = new Date();
+    function getHoursArray(): number[] {
+        const hours: number[] = [];
+        for (let i = 0; i < 24; i++) {
+            hours.push(i);
+        }
+        return hours;
+    }
+
+    function getWeekDays(date: Date): Date[] {
+        const days: Date[] = [];
+        const startOfWeek = new Date(date);
+        startOfWeek.setDate(date.getDate() - date.getDay());
+
+        for (let i = 0; i < 7; i++) {
+            const day = new Date(startOfWeek);
+            day.setDate(startOfWeek.getDate() + i);
+            days.push(day);
+        }
+
+        return days;
     }
 </script>
 
-<!-- Calendar header and navigation -->
-<div class="lg:flex lg:h-full lg:flex-col">
-    <div class="flex items-center justify-between border-b border-gray-200 px-0 py-4 pt-0 lg:flex-none">
-        <h1 class="text-base font-semibold text-gray-900">
-            <time datetime={currentDate.toISOString()}>
-                {months[currentDate.getMonth()]} {currentDate.getFullYear()}
-            </time>
-        </h1>
-        <div class="flex items-center">
-            <div class="relative flex items-center rounded-md bg-white shadow-sm md:items-stretch">
+<div class="calendar-container">
+    <!-- Calendar Header -->
+    <div class="flex justify-between items-center mb-4">
+        <div class="flex items-center space-x-2">
+            <h2 class="text-2xl font-bold text-gray-900">
+                {#if currentView === 'month'}
+                    {getMonthName(currentMonth)} {currentYear}
+                {:else if currentView === 'week'}
+                    Week of {getWeekDays(currentDate)[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {getWeekDays(currentDate)[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {:else}
+                    {currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                {/if}
+            </h2>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <button
+                    class="p-2 rounded-full hover:bg-gray-100 transition"
+                    on:click={() => currentView = 'month'}
+                    class:text-blue-600={currentView === 'month'}
+                    class:font-medium={currentView === 'month'}>
+                Month
+            </button>
+            <button
+                    class="p-2 rounded-full hover:bg-gray-100 transition"
+                    on:click={() => currentView = 'week'}
+                    class:text-blue-600={currentView === 'week'}
+                    class:font-medium={currentView === 'week'}>
+                Week
+            </button>
+            <button
+                    class="p-2 rounded-full hover:bg-gray-100 transition"
+                    on:click={() => currentView = 'day'}
+                    class:text-blue-600={currentView === 'day'}
+                    class:font-medium={currentView === 'day'}>
+                Day
+            </button>
+            <div class="border-l h-6 mx-2 border-gray-300"></div>
+            <div class="flex items-center space-x-1">
                 <button
-                        on:click={previousMonth}
-                        type="button"
-                        class="flex h-9 w-12 items-center justify-center rounded-l-md border-y border-l border-gray-300 pr-1 text-gray-400 hover:text-gray-500 focus:relative md:w-9 md:pr-0 md:hover:bg-gray-50"
-                >
-                    <span class="sr-only">Previous month</span>
-                    <svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path
-                                fill-rule="evenodd"
-                                d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z"
-                                clip-rule="evenodd"
-                        />
+                        class="p-2 rounded-full hover:bg-gray-100 transition"
+                        on:click={() => {
+            if (currentView === 'month') getPreviousMonth();
+            else if (currentView === 'week') getPreviousWeek();
+            else getPreviousDay();
+          }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                     </svg>
                 </button>
                 <button
-                        on:click={goToToday}
-                        type="button"
-                        class="hidden border-y border-gray-300 px-3.5 text-sm font-semibold text-gray-900 hover:bg-gray-50 focus:relative md:block"
-                >
+                        class="p-2 rounded-full hover:bg-gray-100 transition"
+                        on:click={() => {
+            currentDate = new Date();
+            currentMonth = currentDate.getMonth();
+            currentYear = currentDate.getFullYear();
+          }}>
                     Today
                 </button>
-                <span class="relative -mx-px h-5 w-px bg-gray-300 md:hidden"></span>
                 <button
-                        on:click={nextMonth}
-                        type="button"
-                        class="flex h-9 w-12 items-center justify-center rounded-r-md border-y border-r border-gray-300 pl-1 text-gray-400 hover:text-gray-500 focus:relative md:w-9 md:pl-0 md:hover:bg-gray-50"
-                >
-                    <span class="sr-only">Next month</span>
-                    <svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path
-                                fill-rule="evenodd"
-                                d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z"
-                                clip-rule="evenodd"
-                        />
+                        class="p-2 rounded-full hover:bg-gray-100 transition"
+                        on:click={() => {
+            if (currentView === 'month') getNextMonth();
+            else if (currentView === 'week') getNextWeek();
+            else getNextDay();
+          }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                     </svg>
                 </button>
             </div>
-            <!-- Desktop dropdown for view mode -->
-            <div class="hidden md:ml-4 md:flex md:items-center">
-                <div class="relative">
-                    <button
-                            on:click={() => (monthDropdownOpen = !monthDropdownOpen)}
-                            type="button"
-                            class="flex items-center gap-x-1.5 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
-                            id="menu-button"
-                            aria-expanded={monthDropdownOpen}
-                            aria-haspopup="true"
-                    >
-                        Month view
-                        <svg class="-mr-1 w-5 h-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path
-                                    fill-rule="evenodd"
-                                    d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
-                                    clip-rule="evenodd"
-                            />
-                        </svg>
-                    </button>
-                    {#if monthDropdownOpen}
-                        <div
-                                in:scale={{ duration: 100 }}
-                                out:scale={{ duration: 75 }}
-                                class="absolute right-0 z-10 mt-3 w-36 origin-top-right overflow-hidden rounded-md bg-white shadow-lg ring-1 ring-black/5 focus:outline-none"
-                                role="menu"
-                                aria-orientation="vertical"
-                                aria-labelledby="menu-button"
-                        >
-                            <div class="py-1" role="none">
-                                <a href="/" class="block px-4 py-2 text-sm text-gray-700" role="menuitem">Day view</a>
-                                <a href="/" class="block px-4 py-2 text-sm text-gray-700" role="menuitem">Week view</a>
-                                <a href="/" class="block px-4 py-2 text-sm text-gray-700" role="menuitem">Month view</a>
+        </div>
+    </div>
+
+    <!-- Month View -->
+    {#if currentView === 'month'}
+        <div class="grid grid-cols-7 text-center text-sm font-semibold text-gray-700 mb-1">
+            <div class="py-2">Sun</div>
+            <div class="py-2">Mon</div>
+            <div class="py-2">Tue</div>
+            <div class="py-2">Wed</div>
+            <div class="py-2">Thu</div>
+            <div class="py-2">Fri</div>
+            <div class="py-2">Sat</div>
+        </div>
+
+        <div class="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-lg overflow-hidden">
+            {#each Array(getFirstDayOfMonth(currentYear, currentMonth)) as _, i}
+                <div class="bg-gray-50 h-32 p-1"></div>
+            {/each}
+
+            {#each Array(getDaysInMonth(currentYear, currentMonth)) as _, i}
+                {@const day = i + 1}
+                {@const dateObj = new Date(currentYear, currentMonth, day)}
+                {@const isToday = day === new Date().getDate() && currentMonth === new Date().getMonth() && currentYear === new Date().getFullYear()}
+                {@const isSelected = day === selectedDate.getDate() && currentMonth === selectedDate.getMonth() && currentYear === selectedDate.getFullYear()}
+                {@const dayEvents = getEventsForDate(dateObj)}
+
+                <div
+                        class="bg-white h-32 p-1 hover:bg-gray-50 transition cursor-pointer"
+                        class:border-2={isSelected}
+                        class:border-blue-500={isSelected}
+                        on:click={() => selectDate(day)}
+                >
+                    <div class="flex justify-between items-start">
+            <span
+                    class="inline-flex items-center justify-center w-6 h-6 rounded-full text-sm {isToday ? 'bg-blue-600 text-white' : 'text-gray-700'}"
+            >
+              {day}
+            </span>
+                    </div>
+
+                    <div class="mt-1 max-h-24 overflow-y-auto">
+                        {#each dayEvents as event}
+                            <div
+                                    class="text-xs px-1 py-0.5 mb-1 rounded truncate bg-{event.color}-100 text-{event.color}-800 border-l-2 border-{event.color}-400"
+                            >
+                                {formatTime(event.start)} {event.title}
                             </div>
+                        {/each}
+                    </div>
+                </div>
+            {/each}
+
+            {#each Array(42 - getDaysInMonth(currentYear, currentMonth) - getFirstDayOfMonth(currentYear, currentMonth)) as _, i}
+                {#if i < (6 * 7 - getDaysInMonth(currentYear, currentMonth) - getFirstDayOfMonth(currentYear, currentMonth))}
+                    <div class="bg-gray-50 h-32 p-1"></div>
+                {/if}
+            {/each}
+        </div>
+    {/if}
+
+    <!-- Week View -->
+    {#if currentView === 'week'}
+        <div class="grid grid-cols-8 h-600 border border-gray-200 rounded-lg overflow-hidden">
+            <!-- Time column -->
+            <div class="border-r border-gray-200">
+                <div class="h-12 border-b border-gray-200"></div>
+                {#each getHoursArray() as hour}
+                    <div class="h-14 border-b border-gray-200 text-xs text-gray-500 text-right pr-2">
+                        {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                    </div>
+                {/each}
+            </div>
+
+            <!-- Days -->
+            {#each getWeekDays(currentDate) as day, dayIndex}
+                {@const isToday = day.toDateString() === new Date().toDateString()}
+                <div class="relative">
+                    <div class="h-12 border-b border-gray-200 text-center py-3 sticky top-0 bg-white {isToday ? 'bg-blue-50' : ''}">
+                        <div class="text-sm font-medium">{getDayName(day.getDay())}</div>
+                        <div class="text-xs {isToday ? 'bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center mx-auto' : 'text-gray-500'}">
+                            {day.getDate()}
                         </div>
-                    {/if}
+                    </div>
+
+                    {#each getHoursArray() as hour}
+                        <div class="h-14 border-b border-r border-gray-200 {isToday ? 'bg-blue-50' : ''}">
+                            {#each events.filter(event => event.start.getDate() === day.getDate() &&
+                                event.start.getMonth() === day.getMonth() &&
+                                event.start.getFullYear() === day.getFullYear() &&
+                                event.start.getHours() === hour) as event}
+                                <div
+                                        class="absolute ml-1 mr-2 rounded px-1 py-0.5 text-xs bg-{event.color}-100 text-{event.color}-800 border-l-2 border-{event.color}-400 truncate"
+                                        style="top: {12 + hour * 14 + (event.start.getMinutes() / 60) * 14}px;
+                         left: {(dayIndex + 1) * 12.5}%;
+                         width: calc(12.5% - 6px);
+                         height: {((event.end - event.start) / 3600000) * 14}px;"
+                                >
+                                    {formatTime(event.start)} - {event.title}
+                                </div>
+                            {/each}
+                        </div>
+                    {/each}
+                </div>
+            {/each}
+        </div>
+    {/if}
+
+    <!-- Day View -->
+    {#if currentView === 'day'}
+        <div class="grid grid-cols-1 h-600 border border-gray-200 rounded-lg overflow-hidden">
+            <div class="grid grid-cols-12">
+                <!-- Time column -->
+                <div class="col-span-1 border-r border-gray-200">
+                    {#each getHoursArray() as hour}
+                        <div class="h-14 border-b border-gray-200 text-xs text-gray-500 text-right pr-2">
+                            {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                        </div>
+                    {/each}
+                </div>
+
+                <!-- Day column -->
+                <div class="col-span-11 relative">
+                    {#each getHoursArray() as hour}
+                        <div class="h-14 border-b border-gray-200">
+                            {#each events.filter(event => event.start.getDate() === currentDate.getDate() &&
+                                event.start.getMonth() === currentDate.getMonth() &&
+                                event.start.getFullYear() === currentDate.getFullYear() &&
+                                event.start.getHours() === hour) as event}
+                                <div
+                                        class="absolute ml-2 mr-4 rounded px-2 py-1 text-sm bg-{event.color}-100 text-{event.color}-800 border-l-2 border-{event.color}-400"
+                                        style="top: {hour * 14 + (event.start.getMinutes() / 60) * 14}px;
+                         left: 8.33%;
+                         width: calc(91.67% - 8px);
+                         height: {((event.end - event.start) / 3600000) * 14}px;"
+                                >
+                                    <div class="font-medium">{event.title}</div>
+                                    <div class="text-xs opacity-75">{formatTime(event.start)} - {formatTime(event.end)}</div>
+                                </div>
+                            {/each}
+                        </div>
+                    {/each}
                 </div>
             </div>
-            <!-- Mobile dropdown menu -->
-            <div class="relative ml-6 md:hidden">
-                <button
-                        on:click={() => (mobileMenuOpen = !mobileMenuOpen)}
-                        type="button"
-                        class="-mx-2 flex items-center rounded-full border border-transparent p-2 text-gray-400 hover:text-gray-500"
-                        id="menu-0-button"
-                        aria-expanded={mobileMenuOpen}
-                        aria-haspopup="true"
-                >
-                    <span class="sr-only">Open menu</span>
-                    <svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path
-                                d="M3 10a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM8.5 10a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM15.5 8.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"
-                        />
-                    </svg>
-                </button>
-                {#if mobileMenuOpen}
-                    <div
-                            in:scale={{ duration: 100 }}
-                            out:scale={{ duration: 75 }}
-                            class="absolute right-0 z-10 mt-3 w-36 origin-top-right divide-y divide-gray-100 overflow-hidden rounded-md bg-white shadow-lg ring-1 ring-black/5 focus:outline-none"
-                            role="menu"
-                            aria-orientation="vertical"
-                            aria-labelledby="menu-0-button"
-                    >
-                        <div class="py-1" role="none">
-                            <a href="/" class="block px-4 py-2 text-sm text-gray-700" role="menuitem">Create event</a>
-                        </div>
-                        <div class="py-1" role="none">
-                            <a href="/" class="block px-4 py-2 text-sm text-gray-700" role="menuitem">Go to today</a>
-                        </div>
-                        <div class="py-1" role="none">
-                            <a href="/" class="block px-4 py-2 text-sm text-gray-700" role="menuitem">Day view</a>
-                            <a href="/" class="block px-4 py-2 text-sm text-gray-700" role="menuitem">Week view</a>
-                            <a href="/" class="block px-4 py-2 text-sm text-gray-700" role="menuitem">Month view</a>
-                            <a href="/" class="block px-4 py-2 text-sm text-gray-700" role="menuitem">Year view</a>
-                        </div>
-                    </div>
-                {/if}
-            </div>
         </div>
-    </div>
-
-    <!-- Calendar grid -->
-    <div class="shadow ring-1 ring-black/5 lg:flex lg:flex-auto lg:flex-col">
-        <!-- Weekday headers -->
-        <div class="grid grid-cols-7 gap-px border-b border-gray-300 bg-gray-200 text-center text-xs font-semibold text-gray-700 lg:flex-none">
-            <div class="flex justify-center bg-white py-2"><span>S</span></div>
-            <div class="flex justify-center bg-white py-2"><span>M</span></div>
-            <div class="flex justify-center bg-white py-2"><span>T</span></div>
-            <div class="flex justify-center bg-white py-2"><span>W</span></div>
-            <div class="flex justify-center bg-white py-2"><span>T</span></div>
-            <div class="flex justify-center bg-white py-2"><span>F</span></div>
-            <div class="flex justify-center bg-white py-2"><span>S</span></div>
-        </div>
-        <div class="flex bg-gray-200 text-xs text-gray-700 lg:flex-auto">
-            <!-- Desktop view: Grid of days -->
-            <div class="hidden w-full lg:grid lg:grid-cols-7 lg:grid-rows-6 lg:gap-px">
-                {#each calendar as day}
-                    <div class="relative py-2 px-3 {day.isCurrentMonth ? 'bg-white text-gray-900' : 'bg-gray-50 text-gray-500'}">
-                        <time datetime={day.date.toISOString()}>{day.date.getDate()}</time>
-                        {#if day.events.length > 0}
-                            <ol class="mt-2">
-                                {#each day.events as event}
-                                    <li>
-                                        <a href="/" class="group flex">
-                                            <p class="flex-auto truncate font-medium text-gray-900 group-hover:text-indigo-600">
-                                                {event.title}
-                                            </p>
-                                            {#if event.time}
-                                                <time
-                                                        datetime={`${day.date.toISOString().split("T")[0]}T${event.time}`}
-                                                        class="ml-3 hidden flex-none text-gray-500 group-hover:text-indigo-600 xl:block"
-                                                >
-                                                    {event.time}
-                                                </time>
-                                            {/if}
-                                        </a>
-                                    </li>
-                                {/each}
-                            </ol>
-                        {/if}
-                    </div>
-                {/each}
-            </div>
-            <!-- Mobile view: Simplified day buttons -->
-            <div class="isolate grid w-full grid-cols-7 grid-rows-6 gap-px lg:hidden">
-                {#each calendar as day}
-                    <button
-                            type="button"
-                            class="flex h-14 flex-col py-2 px-3 hover:bg-gray-100 focus:z-10 {day.isCurrentMonth ? 'text-gray-900' : 'text-gray-500'}"
-                    >
-                        <time datetime={day.date.toISOString()} class="ml-auto">
-                            {day.date.getDate()}
-                        </time>
-                        {#if day.events.length > 0}
-                            <span class="sr-only">{day.events.length} events</span>
-                            <span class="-mx-0.5 mt-auto flex flex-wrap-reverse">
-                {#each day.events as _}
-                  <span class="mx-0.5 mb-1 w-3 h-3 rounded-full bg-gray-400"></span>
-                {/each}
-              </span>
-                        {:else}
-                            <span class="sr-only">0 events</span>
-                        {/if}
-                    </button>
-                {/each}
-            </div>
-        </div>
-    </div>
-
-    <!-- Mobile events list -->
-    <div class="px-4 py-10 sm:px-6 lg:hidden">
-        <ol class="divide-y divide-gray-100 overflow-hidden rounded-lg bg-white text-sm shadow ring-1 ring-black/5">
-            {#each events as event (event.id)}
-                <li class="group flex p-4 pr-6 focus-within:bg-gray-50 hover:bg-gray-50">
-                    <div class="flex-auto">
-                        <p class="font-semibold text-gray-900">{event.title}</p>
-                        <time
-                                datetime={`${event.date}T${event.time}`}
-                                class="mt-2 flex items-center text-gray-700"
-                        >
-                            <svg class="mr-2 w-5 h-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                <path
-                                        fill-rule="evenodd"
-                                        d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z"
-                                        clip-rule="evenodd"
-                                />
-                            </svg>
-                            {event.time}
-                        </time>
-                    </div>
-                    <a
-                            href="/"
-                            class="ml-6 flex-none self-center rounded-md bg-white px-3 py-2 font-semibold text-gray-900 opacity-0 shadow-sm ring-1 ring-inset ring-gray-300 hover:ring-gray-400 focus:opacity-100 group-hover:opacity-100"
-                    >
-                        Edit<span class="sr-only">, {event.title}</span>
-                    </a>
-                </li>
-            {/each}
-        </ol>
-    </div>
+    {/if}
 </div>
+
+<style>
+    .h-600 {
+        height: 600px;
+        overflow-y: auto;
+    }
+
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .h-600::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .h-600 {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+    }
+</style>

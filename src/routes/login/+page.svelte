@@ -1,44 +1,119 @@
-<script>
-    // import { goto } from '@sveltejs/kit';
-    //
-    // let errorMessage = "";
-    //
-    // async function handleGoogleLogin() {
-    //     try {
-    //         // Replace with your authentication logic (e.g., Firebase, OAuth)
-    //         console.log("Redirecting to Google OAuth...");
-    //         goto('/dashboard'); // Redirect after login success
-    //     } catch (error) {
-    //         errorMessage = "Google login failed. Please try again.";
-    //     }
-    // }
+<script lang="ts">
+    import { onMount } from 'svelte';
+
+    const appName = "TemporalAI";
+    const backToHomeUrl = "/";
+
+    let isLoading = false;
+    let errorMessage = "";
+
+    const handleGoogleLogin = async () => {
+        try {
+            isLoading = true;
+            // This is where you would call your Google OAuth integration
+            console.log("Initiating Google sign-in");
+
+            // Simulate API call
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Redirect to dashboard after successful login
+            window.location.href = "/dashboard";
+        } catch (error) {
+            errorMessage = "Google authentication failed. Please try again.";
+            console.error("Login error:", error);
+        } finally {
+            isLoading = false;
+        }
+    };
 </script>
 
-<div class="flex min-h-screen flex-col justify-center bg-gray-50 py-12 sm:px-6 lg:px-8">
-    <div class="sm:mx-auto sm:w-full sm:max-w-md">
-        <img class="mx-auto h-12 w-auto" src="https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=indigo&shade=600" alt="Your Company">
-        <h2 class="mt-6 text-center text-2xl font-bold tracking-tight text-gray-900">
-            Sign in with Google
-        </h2>
-    </div>
+<div class="min-h-screen w-screen flex justify-center items-center bg-cover bg-center relative"
+     style="background-image: url('https://images.unsplash.com/photo-1557264337-e8a93017fe92?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3');">
 
-    <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-md">
-        <div class="bg-white px-6 py-12 shadow sm:rounded-lg sm:px-12">
-            {#if false}
-                <p class="mb-4 text-center text-sm text-red-500"></p>
-            {/if}
+    <!-- Dark overlay -->
+    <div class="absolute inset-0 bg-black/70"></div>
 
-            <button
-                    on:click={()=>null}
-                    class="flex w-full items-center justify-center gap-3 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus-visible:ring-indigo-600">
-                <svg class="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12.0003 4.75C13.7703 4.75 15.3553 5.36002 16.6053 6.54998L20.0303 3.125C17.9502 1.19 15.2353 0 12.0003 0C7.31028 0 3.25527 2.69 1.28027 6.60998L5.27028 9.70498C6.21525 6.86002 8.87028 4.75 12.0003 4.75Z" fill="#EA4335" />
-                    <path d="M23.49 12.275C23.49 11.49 23.415 10.73 23.3 10H12V14.51H18.47C18.18 15.99 17.34 17.25 16.08 18.1L19.945 21.1C22.2 19.01 23.49 15.92 23.49 12.275Z" fill="#4285F4" />
-                    <path d="M5.26498 14.2949C5.02498 13.5699 4.88501 12.7999 4.88501 11.9999C4.88501 11.1999 5.01998 10.4299 5.26498 9.7049L1.275 6.60986C0.46 8.22986 0 10.0599 0 11.9999C0 13.9399 0.46 15.7699 1.28 17.3899L5.26498 14.2949Z" fill="#FBBC05" />
-                    <path d="M12.0004 24.0001C15.2404 24.0001 17.9654 22.935 19.9454 21.095L16.0804 18.095C15.0054 18.82 13.6204 19.245 12.0004 19.245C8.8704 19.245 6.21537 17.135 5.2654 14.29L1.27539 17.385C3.25539 21.31 7.3104 24.0001 12.0004 24.0001Z" fill="#34A853" />
-                </svg>
-                <span class="text-sm font-semibold">Sign in with Google</span>
-            </button>
+    <!-- Animated gradient elements -->
+    <div class="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500 rounded-full filter blur-3xl opacity-20 animate-pulse"></div>
+    <div class="absolute bottom-1/3 right-1/4 w-72 h-72 bg-purple-500 rounded-full filter blur-3xl opacity-20 animate-pulse" style="animation-delay: 1s;"></div>
+
+    <!-- Back to Home button -->
+    <a href={backToHomeUrl} class="absolute top-8 left-8 text-white flex items-center group z-10">
+        <svg class="w-5 h-5 mr-2 transform group-hover:-translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+        </svg>
+        Back to Home
+    </a>
+
+    <!-- Login Container -->
+    <div class="container relative z-10 px-4 mx-auto">
+        <div class="w-full max-w-md mx-auto">
+            <!-- Logo -->
+            <div class="flex items-center justify-center space-x-2 mb-6">
+                <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <span class="text-white font-bold text-2xl">T</span>
+                </div>
+                <span class="text-white text-2xl font-bold">{appName}</span>
+            </div>
+
+            <!-- Auth Card -->
+            <div class="bg-white/10 backdrop-blur-md p-1 rounded-2xl shadow-2xl">
+                <div class="bg-gray-900 rounded-xl p-8">
+                    <h2 class="text-2xl font-bold text-white mb-4 text-center">Sign in to continue</h2>
+                    <p class="text-gray-400 text-center mb-6">
+                        This application requires a Google account
+                    </p>
+
+                    <!-- Error message -->
+                    {#if errorMessage}
+                        <div class="mb-6 bg-red-900/70 text-white p-3 rounded-lg text-sm">
+                            {errorMessage}
+                        </div>
+                    {/if}
+
+                    <!-- Google Sign In Button -->
+                    <button
+                            type="button"
+                            on:click={handleGoogleLogin}
+                            disabled={isLoading}
+                            class="cursor-pointer w-full flex items-center justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-gray-200 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                        {#if isLoading}
+                            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Processing...
+                        {:else}
+                            <!-- Google Logo -->
+                            <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                            </svg>
+                            Sign in with Google
+                        {/if}
+                    </button>
+
+                    <!-- Added info and license links -->
+                    <div class="mt-6 pt-4 border-t border-gray-800 text-xs text-gray-500 text-center">
+                        <p>
+                            By continuing, you agree to our
+                            <a href="/terms" class="text-blue-400 hover:text-blue-300">Terms of Service</a>
+                        </p>
+                        <p class="mt-2">
+                            <a href="/license" class="text-blue-400 hover:text-blue-300">License Information</a> •
+                            <a href="/privacy" class="text-blue-400 hover:text-blue-300">Privacy Policy</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Help message -->
+            <p class="mt-4 text-center text-sm text-gray-400">
+                Need help? <a href="/support" class="font-medium text-blue-400 hover:text-blue-300">Contact support</a>
+            </p>
         </div>
     </div>
 </div>
