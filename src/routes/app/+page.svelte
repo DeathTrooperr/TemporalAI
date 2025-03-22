@@ -45,7 +45,6 @@
 
 <!-- App container with background image and overlay -->
 <div class="h-screen w-screen bg-cover bg-center relative text-white overflow-hidden flex flex-col"
-     style="background-image: url('https://images.unsplash.com/photo-1557264337-e8a93017fe92?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3');"
      on:click|self={closeUserMenu}>
     <!-- Dark overlay -->
     <div class="absolute inset-0 bg-black/70"></div>
@@ -69,7 +68,7 @@
                 <div class="relative">
                     <button
                             on:click|stopPropagation={toggleUserMenu}
-                            class="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center hover:opacity-90 transition-opacity focus:ring-2 focus:ring-white/30 focus:outline-none"
+                            class="cursor-pointer w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center hover:opacity-90 transition-opacity focus:ring-2 focus:ring-white/30 focus:outline-none"
                             aria-expanded={userMenuOpen}
                             aria-haspopup="true"
                     >
@@ -90,7 +89,7 @@
                             </div>
 
                             <button
-                                    class="w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-700 flex items-center space-x-2"
+                                    class="cursor-pointer w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-700 flex items-center space-x-2"
                                     role="menuitem"
                                     on:click={handleRefreshToken}
                             >
@@ -101,7 +100,7 @@
                             </button>
 
                             <button
-                                    class="w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-700 flex items-center space-x-2"
+                                    class="cursor-pointer w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-700 flex items-center space-x-2"
                                     role="menuitem"
                                     on:click={handleOpenGitHub}
                             >
@@ -113,7 +112,7 @@
 
                             <div class="border-t border-gray-700">
                                 <button
-                                        class="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700 flex items-center space-x-2"
+                                        class="cursor-pointer w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700 flex items-center space-x-2"
                                         role="menuitem"
                                         on:click={handleSignOut}
                                 >
@@ -155,7 +154,7 @@
             <div class="hidden md:grid md:grid-cols-3 gap-4 md:gap-6 h-full">
                 <!-- Calendar (left side) -->
                 <div class="col-span-2 bg-gray-900/80 backdrop-blur-md rounded-lg shadow-2xl overflow-hidden border border-white/10 h-full">
-                    <div class="p-3 md:p-4 h-full overflow-auto">
+                    <div class="h-full overflow-auto">
                         <Calendar />
                     </div>
                 </div>

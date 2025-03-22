@@ -12,6 +12,8 @@
 
     let newMessage = '';
     let chatContainer;
+    let messageInput;
+    let isAtBottom = true;
 
     // Example suggested queries
     const suggestedQueries = [
@@ -20,6 +22,35 @@
         "Reschedule my 3 PM meeting to 4 PM",
         "What's on my calendar for today?"
     ];
+
+    // Auto-resize the textarea based on content
+    function resizeTextarea() {
+        if (!messageInput) return;
+
+        // Reset height to measure the scrollHeight correctly
+        messageInput.style.height = 'auto';
+
+        // Set the height based on content (with a maximum height cap)
+        const maxHeight = 150; // maximum height in pixels
+        const newHeight = Math.min(messageInput.scrollHeight, maxHeight);
+        messageInput.style.height = `${newHeight}px`;
+
+        // Add scrollbar if content exceeds max height
+        messageInput.style.overflowY = newHeight === maxHeight ? 'auto' : 'hidden';
+    }
+
+    // Check if user is at bottom of chat
+    function checkIfAtBottom() {
+        if (!chatContainer) return;
+
+        const threshold = 20; // pixels from bottom to consider "at bottom"
+        const scrollBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight;
+        isAtBottom = scrollBottom < threshold;
+    }
+
+    function handleScroll() {
+        checkIfAtBottom();
+    }
 
     function sendMessage() {
         if (newMessage.trim() === '') return;
@@ -36,6 +67,9 @@
         const userMessage = newMessage;
         newMessage = '';
 
+        // Reset textarea height after clearing
+        setTimeout(resizeTextarea, 0);
+
         // Simulate AI typing
         setTimeout(() => {
             messages = [...messages, {
@@ -49,6 +83,7 @@
 
     function sendSuggestedQuery(query) {
         newMessage = query;
+        setTimeout(resizeTextarea, 0);
         sendMessage();
     }
 
@@ -67,12 +102,27 @@
         }
     }
 
-    // Auto scroll to bottom when new messages arrive
-    $: if (messages && chatContainer) {
+    // Auto scroll to bottom when new messages arrive, but only if already at bottom
+    $: if (messages && chatContainer && isAtBottom) {
         setTimeout(() => {
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }, 0);
     }
+
+    // Watch for changes to newMessage to resize textarea
+    $: if (newMessage !== undefined) {
+        setTimeout(resizeTextarea, 0);
+    }
+
+    // Initialize scroll position and check status
+    onMount(() => {
+        if (chatContainer) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            checkIfAtBottom();
+        }
+        // Initialize textarea height
+        resizeTextarea();
+    });
 
     // Format time for messages
     function formatTime(date) {
@@ -80,39 +130,48 @@
     }
 </script>
 
-<div class="flex flex-col h-full">
-    <div class="flex items-center justify-between p-3 border-b">
-        <div class="flex items-center space-x-2">
-            <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                <span class="text-white font-bold text-xs">AI</span>
-            </div>
-            <h3 class="font-medium">TemporalAI Assistant</h3>
+<div class="flex flex-col h-full bg-gray-900 text-white rounded-lg overflow-hidden shadow-2xl">
+    <!-- Header with same styling as landing page -->
+    <div class="flex items-center justify-between p-4 bg-gray-800 border-b border-gradient-horizontal">
+        <div>
+            <h3 class="font-bold text-xl">TemporalAI Assistant</h3>
         </div>
-        <div class="text-xs text-gray-500">Online</div>
+        <div class="text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded-full">Online</div>
     </div>
 
-    <div class="flex-1 overflow-y-auto p-4 space-y-4" bind:this={chatContainer}>
-        {#each messages as message (message.id)}
-            <div class="flex {message.sender === 'user' ? 'justify-end' : 'justify-start'}">
-                <div class="max-w-3/4 {message.sender === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'} p-3 rounded-lg">
-                    <div>{message.text}</div>
-                    <div class="text-xs opacity-75 mt-1 text-right">
-                        {formatTime(message.timestamp)}
+    <!-- Animated gradient elements similar to landing page -->
+    <div class="relative flex-1 overflow-hidden">
+        <!-- Chat messages container with custom scrollbar -->
+        <div
+                class="flex-1 overflow-y-auto p-4 space-y-4 relative z-10 h-full scrollbar-styled"
+                bind:this={chatContainer}
+                on:scroll={handleScroll}
+        >
+            {#each messages as message (message.id)}
+                <div class="flex {message.sender === 'user' ? 'justify-end' : 'justify-start'}">
+                    <div class="max-w-3/4 {message.sender === 'user'
+                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
+                        : 'bg-gray-800 text-gray-200 border border-gray-700'}
+                        p-4 rounded-lg shadow-lg">
+                        <div>{message.text}</div>
+                        <div class="text-xs opacity-75 mt-1 text-right">
+                            {formatTime(message.timestamp)}
+                        </div>
                     </div>
                 </div>
-            </div>
-        {/each}
+            {/each}
+        </div>
     </div>
 
+    <!-- Suggested queries section -->
     {#if messages.length === 1}
         <div class="px-4 pb-4">
-            <div class="text-sm text-gray-500 mb-2">Suggested queries:</div>
-            <div class="flex flex-wrap gap-2">
+            <div class="text-sm text-gray-300 mb-2">Try asking:</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {#each suggestedQueries as query}
                     <button
-                            class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded-full text-sm transition"
                             on:click={() => sendSuggestedQuery(query)}
-                    >
+                            class="cursor-pointer text-left p-3 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 transition">
                         {query}
                     </button>
                 {/each}
@@ -120,24 +179,30 @@
         </div>
     {/if}
 
-    <div class="p-3 border-t bg-white">
-        <form class="flex items-center space-x-2" on:submit|preventDefault={sendMessage}>
-            <div class="flex-1 relative">
-                <input
-                        type="text"
-                        bind:value={newMessage}
-                        placeholder="Ask me anything about your calendar..."
-                        class="w-full p-2 pl-3 pr-10 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-            </div>
+    <!-- Input area styled to match landing page terminal style -->
+    <div class="p-4 bg-gray-800 border-t border-gray-700">
+        <form on:submit|preventDefault={sendMessage} class="flex space-x-2">
+            <textarea
+                    bind:this={messageInput}
+                    bind:value={newMessage}
+                    placeholder="Type your message..."
+                    rows="1"
+                    on:input={resizeTextarea}
+                    class="flex-grow bg-gray-900 text-gray-200 border border-gray-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none min-h-[46px]"
+            ></textarea>
             <button
                     type="submit"
-                    class="p-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-full transition"
-            >
+                    class="cursor-pointer px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold rounded-lg transition transform hover:scale-105 flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd" />
                 </svg>
             </button>
         </form>
     </div>
 </div>
+
+<style>
+    .border-gradient-horizontal {
+        border-image: linear-gradient(to left, #3b82f6, #8b5cf6) 1;
+    }
+</style>

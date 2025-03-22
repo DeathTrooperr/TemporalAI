@@ -1,14 +1,11 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
-
     const appName = "TemporalAI";
     const loginPage = "/login";
     const githubRepo = "https://github.com/DeathTrooperr/TemporalAI";
 </script>
 
 <!-- Hero Section (Full Page) -->
-<header class="min-h-screen w-screen flex justify-center items-center bg-cover bg-center relative"
-        style="background-image: url('https://images.unsplash.com/photo-1557264337-e8a93017fe92?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3');">
+<header class="min-h-screen w-screen flex justify-center items-center bg-cover bg-center relative">
     <!-- Dark overlay -->
     <div class="absolute inset-0 bg-black/70"></div>
 
