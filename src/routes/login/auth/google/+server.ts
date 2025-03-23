@@ -1,9 +1,10 @@
 import { redirect } from '@sveltejs/kit';
 import { setAuthCookie, type UserSession } from '$lib/server/auth.js';
+import { env } from '$env/dynamic/private';
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID as string;
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET as string;
-const REDIRECT_URI = process.env.REDIRECT_URI || 'https://your-app.pages.dev/login/auth/google';
+const GOOGLE_CLIENT_ID = env.GOOGLE_CLIENT_ID as string;
+const GOOGLE_CLIENT_SECRET = env.GOOGLE_CLIENT_SECRET as string;
+const REDIRECT_URI = env.REDIRECT_URI || 'https://your-app.pages.dev/login/auth/google';
 const AUTH_REDIRECT = '/app';
 
 export async function GET({ url, cookies }) {
