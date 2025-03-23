@@ -1,6 +1,9 @@
 <script>
+    export let data;
     import Calendar from "$lib/components/calendar.svelte";
     import Chatbox from "$lib/components/chatbox.svelte";
+    import {goto} from "$app/navigation";
+    const { user } = data;
 
     // State for the mobile tab toggle
     let activeTab = 'calendar'; // Default to calendar view
@@ -25,8 +28,7 @@
 
     // Handle menu actions
     function handleSignOut() {
-        // Sign out logic would go here
-        alert('Signing out...');
+        goto('/logout');
         closeUserMenu();
     }
 
@@ -44,15 +46,8 @@
 </script>
 
 <!-- App container with background image and overlay -->
-<div class="h-screen w-screen bg-cover bg-center relative text-white overflow-hidden flex flex-col"
-     on:click|self={closeUserMenu}>
-    <!-- Dark overlay -->
-    <div class="absolute inset-0 bg-black/70"></div>
-
-    <!-- Animated gradient elements - adjusted for better mobile visibility -->
-    <div class="absolute top-1/4 left-1/4 w-32 md:w-64 h-32 md:h-64 bg-blue-500 rounded-full filter blur-3xl opacity-20 animate-pulse"></div>
-    <div class="absolute bottom-1/3 right-1/4 w-40 md:w-72 h-40 md:h-72 bg-purple-500 rounded-full filter blur-3xl opacity-20 animate-pulse" style="animation-delay: 1s;"></div>
-
+<svelte:window on:click={closeUserMenu} />
+<div class="h-screen w-screen bg-cover bg-center relative text-white overflow-hidden flex flex-col">
     <div class="container mx-auto px-3 sm:px-4 relative z-10 flex flex-col h-full" on:click|self={closeUserMenu}>
         <!-- App header with mobile optimization -->
         <header class="py-3 md:py-4">
@@ -85,7 +80,7 @@
                         >
                             <div class="px-4 py-3 border-b border-gray-700">
                                 <p class="text-sm">Signed in as</p>
-                                <p class="text-sm font-medium truncate">user@example.com</p>
+                                <p class="text-sm font-medium truncate">{user.email}</p>
                             </div>
 
                             <button
@@ -129,7 +124,7 @@
         </header>
 
         <!-- Main content - takes all available space with the footer removed -->
-        <main class="flex-grow py-2 md:py-4 overflow-hidden flex flex-col">
+        <main class="flex-grow pb-2 md:pb-4 overflow-hidden flex flex-col">
             <!-- Tab navigation for mobile -->
             <div class="md:hidden flex mb-2 space-x-2">
                 <button
@@ -170,7 +165,7 @@
                 <!-- Calendar view (conditionally shown based on activeTab) -->
                 {#if activeTab === 'calendar'}
                     <div class="flex-grow bg-gray-900/80 backdrop-blur-md rounded-lg shadow-2xl overflow-hidden border border-white/10">
-                        <div class="p-3 h-full overflow-auto">
+                        <div class="h-full overflow-auto">
                             <Calendar />
                         </div>
                     </div>

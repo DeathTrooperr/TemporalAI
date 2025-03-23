@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
+    import {goto} from "$app/navigation";
 
     const appName = "TemporalAI";
     const backToHomeUrl = "/";
@@ -10,14 +11,7 @@
     const handleGoogleLogin = async () => {
         try {
             isLoading = true;
-            // This is where you would call your Google OAuth integration
-            console.log("Initiating Google sign-in");
-
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Redirect to dashboard after successful login
-            window.location.href = "/app";
+            await goto('/login/auth/google');
         } catch (error) {
             errorMessage = "Google authentication failed. Please try again.";
             console.error("Login error:", error);
@@ -28,14 +22,6 @@
 </script>
 
 <div class="min-h-screen w-screen flex justify-center items-center bg-cover bg-center relative">
-
-    <!-- Dark overlay -->
-    <div class="absolute inset-0 bg-black/70"></div>
-
-    <!-- Animated gradient elements -->
-    <div class="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500 rounded-full filter blur-3xl opacity-20 animate-pulse"></div>
-    <div class="absolute bottom-1/3 right-1/4 w-72 h-72 bg-purple-500 rounded-full filter blur-3xl opacity-20 animate-pulse" style="animation-delay: 1s;"></div>
-
     <!-- Back to Home button -->
     <a href={backToHomeUrl} class="absolute top-8 left-8 text-white flex items-center group z-10">
         <svg class="w-5 h-5 mr-2 transform group-hover:-translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -108,11 +94,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Help message -->
-            <p class="mt-4 text-center text-sm text-gray-400">
-                Need help? <a href="/support" class="font-medium text-blue-400 hover:text-blue-300">Contact support</a>
-            </p>
         </div>
     </div>
 </div>

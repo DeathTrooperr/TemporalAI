@@ -7,13 +7,6 @@
 
 <!-- Error Section -->
 <header class="min-h-screen w-screen flex justify-center items-center bg-cover bg-center relative">
-    <!-- Dark overlay -->
-    <div class="absolute inset-0 bg-black/70"></div>
-
-    <!-- Animated gradient elements -->
-    <div class="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500 rounded-full filter blur-3xl opacity-20 animate-pulse"></div>
-    <div class="absolute bottom-1/3 right-1/4 w-72 h-72 bg-purple-500 rounded-full filter blur-3xl opacity-20 animate-pulse" style="animation-delay: 1s;"></div>
-
     <div class="container relative z-10 px-4 mx-auto flex flex-col items-center">
         <!-- App Logo -->
         <div class="flex items-center space-x-2 mb-10">

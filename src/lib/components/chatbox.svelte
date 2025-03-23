@@ -81,6 +81,16 @@
         }, 1000);
     }
 
+    // Handle key press events in the textarea
+    function handleKeyDown(event) {
+        // If Enter is pressed without Shift key, submit the message
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault(); // Prevent adding a new line
+            sendMessage();
+        }
+        // If Shift+Enter is pressed, allow the default behavior (new line)
+    }
+
     function sendSuggestedQuery(query) {
         newMessage = query;
         setTimeout(resizeTextarea, 0);
@@ -132,7 +142,7 @@
 
 <div class="flex flex-col h-full bg-gray-900 text-white rounded-lg overflow-hidden shadow-2xl">
     <!-- Header with same styling as landing page -->
-    <div class="flex items-center justify-between p-4 bg-gray-800 border-b border-gradient-horizontal">
+    <div class="flex items-center justify-between p-5 bg-gray-800 border-b border-gradient-horizontal">
         <div>
             <h3 class="font-bold text-xl">TemporalAI Assistant</h3>
         </div>
@@ -188,6 +198,7 @@
                     placeholder="Type your message..."
                     rows="1"
                     on:input={resizeTextarea}
+                    on:keydown={handleKeyDown}
                     class="flex-grow bg-gray-900 text-gray-200 border border-gray-700 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none min-h-[46px]"
             ></textarea>
             <button
