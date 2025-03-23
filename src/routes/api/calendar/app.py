@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 from datetime import datetime, timedelta
 import requests
 from flask import Flask, request, jsonify
@@ -9,45 +10,41 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from openai import OpenAI
 from dotenv import load_dotenv
+import re
 
 # Load environment variables from .env file
 load_dotenv()
 
+# Set up Flask app and logging
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
 
 # Define scope for GCal API access
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 
 def get_calendar_service():
-    """Authenticate and get Google Calendar service."""
+    """Authenticate and get Google Calendar service with OAuth callback on port 8080."""
     creds = None
 
-    # Check if token.json file exists and load credentials from it
+    # Load stored credentials from token.json if they exist
     if os.path.exists('token.json'):
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
 
-    # If no valid credentials, start OAuth flow
+    # If credentials are missing or invalid, run OAuth on port 8080
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            # Check if the credentials file exists
-            credentials_file = os.getenv('CREDENTIALS_FILE')
-            if not credentials_file or not os.path.exists(credentials_file):
-                raise FileNotFoundError("Google client secrets file not found. Check 'CREDENTIALS_FILE' path in your .env file.")
+            flow = InstalledAppFlow.from_client_secrets_file(os.getenv('CLIENT_SECRETS'), SCOPES)
+            creds = flow.run_local_server(port=8080)  # Use port 8080 for the OAuth callback
 
-            # Run OAuth flow with the correct port and redirect URI
-            flow = InstalledAppFlow.from_client_secrets_file(credentials_file, SCOPES)
-            creds = flow.run_local_server(port=5000)  # Using port 5000 to match Flask app
-
-        # Save new credentials to token.json
+        # Save the new credentials to token.json
         with open('token.json', 'w') as token_file:
             token_file.write(creds.to_json())
 
-    # Build the Google Calendar service
+    # Return authenticated Google Calendar service
     return build('calendar', 'v3', credentials=creds)
-
 
 
 def get_nebius_llm_response(user_input):
@@ -56,66 +53,52 @@ def get_nebius_llm_response(user_input):
         base_url="https://api.studio.nebius.com/v1/",
         api_key=os.environ.get("NEBIUS_API_KEY")
     )
-    
-    # Get current date and time
+
     now = datetime.now()
-    current_time_str = now.strftime("%Y-%m-%dT%H:%M:%S")
-    day_of_week = now.strftime("%A")
-    
-    system_message = """Today's date is {0} and the time is {1}.
-You are an intelligent assistant that parses user commands related to Google Calendar and returns structured information in JSON format. Your task is to extract relevant details from the user's input, handle vague or implied actions when necessary, and convert relative dates to specific calendar dates. Ignore any extra information not needed for JSON output, including timezones or reminders.
-    """.format(now.strftime("%Y-%m-%d"), now.strftime("%I:%M %p"))
-    
-    # Send the user input and system message to Nebius LLM to process
+    system_message = f"Today's date is {now.strftime('%Y-%m-%d')} and the time is {now.strftime('%I:%M %p')}."
+    system_message += "\nYou are an intelligent assistant that parses user commands related to Google Calendar and returns structured information in JSON format."
+    system_message += """
+    You must always respond with structured JSON like:
+    {
+        "action": "create",
+        "event_title": "Team Meeting",
+        "date": "YYYY-MM-DD",
+        "event_time": "3 PM",
+        "attendees": ["john@example.com"],
+        "duration": "1 hour"
+    }
+    """
+
+    # Send user input and system message to Nebius LLM
     response = client.chat.completions.create(
         model="meta-llama/Meta-Llama-3.1-70B-Instruct",
         max_tokens=512,
         temperature=0.6,
         top_p=0.9,
-        extra_body={
-            "top_k": 50
-        },
+        extra_body={"top_k": 50},
         messages=[
-            {
-                "role": "system",
-                "content": system_message
-            },
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": user_input
-                    }
-                ]
-            }
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": [{"type": "text", "text": user_input}]}
         ]
     )
-    
-    # Get JSON output from Nebius LLM
+
+    # Parse JSON from the Nebius LLM response
     response_content = response.choices[0].message.content
-    
-    # Try to parse the JSON from the output
     try:
+        # Try parsing the LLM response as JSON
         json_data = json.loads(response_content)
+        logging.info(f"Nebius LLM response: {response_content}")
         return json_data
     except json.JSONDecodeError:
-        import re
+        # Fallback: Attempt to extract JSON if it's embedded in text or wrapped in backticks
         json_match = re.search(r'```json\n(.*?)\n```', response_content, re.DOTALL)
         if json_match:
             try:
                 return json.loads(json_match.group(1))
-            except:
+            except json.JSONDecodeError:
                 pass
-                
-        # Last resort: try to find anything that looks like JSON
-        json_match = re.search(r'{.*}', response_content, re.DOTALL)
-        if json_match:
-            try:
-                return json.loads(json_match.group(0))
-            except:
-                return {"error": "Could not parse response from LLM"}
-        
+
+        logging.error(f"Failed to parse JSON from LLM response: {response_content}")
         return {"error": "Could not parse response from LLM"}
 
 
@@ -326,52 +309,49 @@ def calculate_duration_from_event(event):
         return f"{int(total_minutes / 60)} hour{'s' if total_minutes / 60 > 1 else ''}"
     else:
         return f"{int(total_minutes)} minute{'s' if total_minutes > 1 else ''}"
-
+    
 
 @app.route('/api/calendar', methods=['POST', 'GET'])
 def handle_calendar_request():
-    """API endpoint to handle calendar requests from the chat."""
+    """API endpoint to handle calendar requests from the chat using Nebius LLM."""
     if request.method == 'GET':
         return jsonify({"message": "Calendar API is running"}), 200
-    
+
     data = request.json
     user_message = data.get('message', '')
-    
+
     if not user_message:
         return jsonify({"error": "No message provided"}), 400
-    
+
+    logging.info(f"Received message: {user_message}")
+
     # Get structured data from Nebius LLM
     parsed_data = get_nebius_llm_response(user_message)
-    
     if 'error' in parsed_data:
         return jsonify(parsed_data), 500
-    
-    # Get calendar service
+
     try:
         calendar_service = get_calendar_service()
     except Exception as e:
         return jsonify({"error": f"Failed to authenticate with Google Calendar: {str(e)}"}), 500
-    
-    # Execute the appropriate action
+
     action = parsed_data.get('action', '').lower()
+    logging.info(f"Action determined: {action}")
+
     result = {"status": "success", "action": action}
-    
     try:
         if action == 'create':
             event_id = create_event(calendar_service, parsed_data)
             result["event_id"] = event_id
             result["message"] = f"Created event: {parsed_data.get('event_title')}"
-            
         elif action == 'reschedule':
             event_id = reschedule_event(calendar_service, parsed_data)
             result["event_id"] = event_id
             result["message"] = f"Rescheduled event: {parsed_data.get('event_title')}"
-            
         elif action == 'cancel':
             event_id = cancel_event(calendar_service, parsed_data)
             result["event_id"] = event_id
             result["message"] = f"Cancelled event: {parsed_data.get('event_title')}"
-            
         else:
             result = {
                 "status": "error",
@@ -379,8 +359,9 @@ def handle_calendar_request():
             }
     except Exception as e:
         result = {"status": "error", "message": f"Error processing calendar request: {str(e)}"}
-    
+
     return jsonify(result)
 
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000)  # Flask app runs on port 5000
