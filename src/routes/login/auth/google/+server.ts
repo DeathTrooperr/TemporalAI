@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
-import { setAuthCookie, type UserSession } from '$lib/server/auth.js';
+import { setAuthCookie } from '$lib/server/auth.js';
 import { env } from '$env/dynamic/private';
+import type { UserSession } from '$lib/interfaces/userSession.js';
 
 const GOOGLE_CLIENT_ID = env.GOOGLE_CLIENT_ID as string;
 const GOOGLE_CLIENT_SECRET = env.GOOGLE_CLIENT_SECRET as string;
@@ -16,7 +17,7 @@ export async function GET({ url, cookies }) {
         authUrl.searchParams.append('client_id', GOOGLE_CLIENT_ID);
         authUrl.searchParams.append('redirect_uri', REDIRECT_URI);
         authUrl.searchParams.append('response_type', 'code');
-        authUrl.searchParams.append('scope', 'email profile');
+        authUrl.searchParams.append('scope', 'email profile https://www.googleapis.com/auth/calendar.events.owned');
         authUrl.searchParams.append('access_type', 'offline');
         authUrl.searchParams.append('prompt', 'consent');
 
@@ -50,12 +51,12 @@ export async function GET({ url, cookies }) {
 
         const userData = await userInfoResponse.json();
 
-        // Step 4: Create session
         const user: UserSession = {
             id: userData.id,
             email: userData.email,
             name: userData.name,
-            picture: userData.picture
+            picture: userData.picture,
+            token: tokens.access_token,
         };
 
         // Step 5: Set auth cookie

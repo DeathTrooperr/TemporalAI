@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { goto } from "$app/navigation";
-    import { page } from "$app/stores";
+    import { page } from "$app/state";
 
     const appName = "TemporalAI";
     const backToHomeUrl = "/";
@@ -12,7 +12,7 @@
     // Check for error parameters when component mounts
     onMount(() => {
         // Get error type from URL if present
-        const errorType = $page.url.searchParams.get('error');
+        const errorType = page.url.searchParams.get('error');
 
         if (errorType) {
             switch (errorType) {

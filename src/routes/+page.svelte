@@ -1,7 +1,25 @@
 <script lang="ts">
+    export let data;
+    import { onMount } from 'svelte';
+    import Banner from '$lib/components/banner.svelte';
+
     const appName = "TemporalAI";
     const githubRepo = "https://github.com/DeathTrooperr/TemporalAI";
+
+    let bannerComponent: Banner;
+
+    onMount(() => {
+        const logoutSuccess = data.logout;
+
+        if (logoutSuccess === 'true') {
+            bannerComponent.show('You have been successfully logged out!');
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+        }
+    });
 </script>
+
+<Banner bind:this={bannerComponent} />
 
 <!-- Hero Section (Full Page) -->
 <header class="min-h-screen w-screen flex justify-center items-center bg-cover bg-center relative">

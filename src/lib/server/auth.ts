@@ -1,13 +1,8 @@
-import jwt from 'jsonwebtoken';
+import jwt, { type JwtPayload } from 'jsonwebtoken';
 import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
-
-export interface UserSession {
-    id: string;
-    email: string;
-    name: string;
-    picture: string;
-}
+import type { UserSession } from '$lib/interfaces/userSession.js';
+import type { Cookies } from '@sveltejs/kit';
 
 const JWT_SECRET = env.JWT_SECRET as string;
 const COOKIE_NAME = 'session';
@@ -15,20 +10,27 @@ const JWT_EXPIRES_IN = '7d';
 
 // Create JWT token
 export function createToken(user: UserSession): string {
-    return jwt.sign(user, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    return jwt.sign(user, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN, });
 }
 
 // Verify JWT token
 export function verifyToken(token: string): UserSession | null {
     try {
-        return jwt.verify(token, JWT_SECRET) as UserSession;
+        const decoded = jwt.verify(token, JWT_SECRET) as UserSession;
+        if (!isValidUserSession(decoded)) return null;
+        return decoded;
     } catch (error) {
         return null;
     }
 }
 
-// Set auth cookie
-export function setAuthCookie(cookies: any, user: UserSession) {
+// Helper to validate UserSession type
+function isValidUserSession(obj: any): obj is UserSession {
+    return obj && typeof obj === 'object' && 'id' in obj;
+}
+
+// Set auth cookie with improved typing
+export function setAuthCookie(cookies: Cookies, user: UserSession): void {
     const token = createToken(user);
     cookies.set(COOKIE_NAME, token, {
         path: '/',
@@ -39,14 +41,30 @@ export function setAuthCookie(cookies: any, user: UserSession) {
     });
 }
 
-// Clear auth cookie
-export function clearAuthCookie(cookies: any) {
+// Clear auth cookie with improved typing
+export function clearAuthCookie(cookies: Cookies): void {
     cookies.delete(COOKIE_NAME, { path: '/' });
 }
 
-// Get user from cookies
-export function getUserFromCookies(cookies: any): UserSession | null {
+// Get user from cookies with improved typing
+export function getUserFromCookies(cookies: Cookies): UserSession | null {
     const token = cookies.get(COOKIE_NAME);
     if (!token) return null;
     return verifyToken(token);
+}
+
+// Improved resignToken function
+export function resignToken(cookies: Cookies): boolean {
+    try {
+        const token = cookies.get(COOKIE_NAME);
+        if (!token) return false;
+        const payload = jwt.verify(token, JWT_SECRET) as JwtPayload;
+        if (!isValidUserSession(payload)) return false;
+        const { exp, iat, ...payloadWithoutExpiry } = payload as JwtPayload;
+        setAuthCookie(cookies, payloadWithoutExpiry as UserSession);
+        return true;
+    } catch (error) {
+        console.error('Error resigning token:', error);
+        return false;
+    }
 }

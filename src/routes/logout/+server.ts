@@ -3,5 +3,5 @@ import { clearAuthCookie } from '$lib/server/auth.js';
 
 export function GET({ cookies }) {
     clearAuthCookie(cookies);
-    return redirect(302, '/');
+    return redirect(302, '/?logout=true');
 }
