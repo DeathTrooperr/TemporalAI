@@ -1,8 +1,8 @@
 import jwt, { type JwtPayload } from 'jsonwebtoken';
-import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
 import type { UserSession } from '$lib/interfaces/userSession.js';
 import type { Cookies } from '@sveltejs/kit';
+import { DEV } from 'esm-env';
 
 const JWT_SECRET = env.JWT_SECRET as string;
 const COOKIE_NAME = 'session';
@@ -35,7 +35,7 @@ export function setAuthCookie(cookies: Cookies, user: UserSession): void {
     cookies.set(COOKIE_NAME, token, {
         path: '/',
         httpOnly: true,
-        secure: !dev,
+        secure: !DEV,
         sameSite: 'lax',
         maxAge: 60 * 60 * 24 * 7, // 7 days
     });
