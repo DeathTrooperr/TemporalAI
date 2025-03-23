@@ -20,27 +20,34 @@ SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 
 def get_calendar_service():
-    """Authenticate with GCal."""
+    """Authenticate and get Google Calendar service."""
     creds = None
-    # Check if token.json file exists and get stored user credentials
+
+    # Check if token.json file exists and load credentials from it
     if os.path.exists('token.json'):
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    
-    # If credentials are not valid, refresh or prompt user to log in
+
+    # If no valid credentials, start OAuth flow
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            # Use OAuth flow to get new credentials
-            flow = InstalledAppFlow.from_client_secrets_file(
-                os.getenv('CREDENTIALS_FILE'), SCOPES)
-            flow.redirect_uri = 'http://localhost:8080/'  # TEST: Change this from 5000 to 8080
-            creds = flow.run_local_server(port=8080)  # Change port
-        # Save the new credentials to token.json
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
+            # Check if the credentials file exists
+            credentials_file = os.getenv('CREDENTIALS_FILE')
+            if not credentials_file or not os.path.exists(credentials_file):
+                raise FileNotFoundError("Google client secrets file not found. Check 'CREDENTIALS_FILE' path in your .env file.")
 
+            # Run OAuth flow with the correct port and redirect URI
+            flow = InstalledAppFlow.from_client_secrets_file(credentials_file, SCOPES)
+            creds = flow.run_local_server(port=5000)  # Using port 5000 to match Flask app
+
+        # Save new credentials to token.json
+        with open('token.json', 'w') as token_file:
+            token_file.write(creds.to_json())
+
+    # Build the Google Calendar service
     return build('calendar', 'v3', credentials=creds)
+
 
 
 def get_nebius_llm_response(user_input):
