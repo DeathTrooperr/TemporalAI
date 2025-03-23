@@ -64,5 +64,8 @@
 	"dependencies": {
 		"jsonwebtoken": "^9.0.2",
 		"svelte-transition": "^0.0.17"
+	},
+	"engines": {
+		"node": ">=18.18.0"
 	}
 }
