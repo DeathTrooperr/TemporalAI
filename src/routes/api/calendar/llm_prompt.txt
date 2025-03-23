@@ -55,8 +55,7 @@ Parsing Rules:
 
     	Leave "action" blank if the action is ambiguous.
 
-Output only the JSON, with no additional text or explanation. Example output structure:
-
+Output just the JSON. Example output structure:
 {
   "input_timestamp": "YYYY-MM-DDTHH:MM:SS",
   "current_day": "Day_of_the_week",
