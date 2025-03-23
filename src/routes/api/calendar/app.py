@@ -11,6 +11,8 @@ from googleapiclient.discovery import build
 from openai import OpenAI
 from dotenv import load_dotenv
 import re
+import pytz
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -36,10 +38,14 @@ def get_calendar_service():
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(os.getenv('CLIENT_SECRETS'), SCOPES)
-            creds = flow.run_local_server(port=8080)  # Use port 8080 for the OAuth callback
+            flow = InstalledAppFlow.from_client_secrets_file(
+                os.getenv('CLIENT_SECRETS'),
+                SCOPES
+            )
+            # Request offline access to get a refresh token
+            creds = flow.run_local_server(port=8080, access_type='offline', prompt='consent')
 
-        # Save the new credentials to token.json
+        # Save the new credentials to token.json, including the refresh token
         with open('token.json', 'w') as token_file:
             token_file.write(creds.to_json())
 
@@ -54,20 +60,233 @@ def get_nebius_llm_response(user_input):
         api_key=os.environ.get("NEBIUS_API_KEY")
     )
 
+    # Get current date and time
     now = datetime.now()
+    current_date = now.strftime('%Y-%m-%d')
+    current_time = now.strftime('%I:%M %p')
+
+    logging.info(f"Current date: {current_date}, Current time: {current_time}")
     system_message = f"Today's date is {now.strftime('%Y-%m-%d')} and the time is {now.strftime('%I:%M %p')}."
-    system_message += "\nYou are an intelligent assistant that parses user commands related to Google Calendar and returns structured information in JSON format."
-    system_message += """
-    You must always respond with structured JSON like:
+    system_message += """You are an intelligent assistant that parses user commands related to Google Calendar and returns structured information in JSON format. Your task is to extract relevant details from the user’s input, handle vague or implied actions when necessary, and convert relative dates to specific calendar dates. Ignore any extra information not needed for JSON output, including timezones or reminders.
+    Parsing Rules:
+
+        Capture Input Timestamp and Current Day of the Week:
+        Use the exact date and time the input is processed to generate the "input_timestamp" in ISO 8601 format (e.g., "2025-03-21T14:45:00"), and include the day of the week (e.g., "Friday") in the output as "current_day".
+
+        Ignore Timezones and Reminders:
+
+            If the user's input includes timezones (e.g., "4 PM EST" or "7 PM UTC"), extract only the time (e.g., "4 PM" or "7 PM") and ignore the timezone.
+
+            Ignore any user input requesting reminders (e.g., "remind me to..." or "set a reminder for..."). Do not include reminders in the "notes" field or in any part of the JSON output.
+
+        Convert Relative Dates to Specific Dates:
+        When users provide relative timing (e.g., "tomorrow" or "next Friday"), follow these specific rules:
+
+            "Tomorrow" → The next calendar day.
+
+            "Next [weekday]" → The next occurrence of that weekday, even if today is that day (e.g., "next Friday" returns next week’s Friday).
+
+            "This afternoon" or "this evening" → Uses today’s date.
+
+            If the event is implied to occur today but includes a time like "4 PM", assume today’s date.
+
+            Output format for dates: "YYYY-MM-DD".
+
+        Simplify Recurring Events:
+        If the input mentions a recurring event (e.g., "every Thursday at 3 PM"), treat it as a single event on the next relevant date (e.g., "next Thursday").
+
+        Extract Event Details:
+        Identify and extract the following key event details:
+
+            Event title: The main title or purpose of the event.
+
+            Time: Original event time in 12-hour format with AM/PM.
+
+            New Time: Extract if the input is a reschedule request.
+
+            Date: Convert relative dates to specific calendar dates.
+
+            Duration: Extract if mentioned (e.g., "1-hour meeting").
+
+            Location: Capture if explicitly stated.
+
+            Attendees: Extract any listed attendees or people.
+
+            Notes: Capture additional information like "bring project files", excluding reminders or timezone information.
+
+        Predict Action When Unclear:
+
+            Use "create" if the input sounds like scheduling a new event.
+
+            Use "reschedule" if the input sounds like changing an existing event's time or date.
+
+            Use "cancel" if the input sounds like removing or canceling an event.
+
+            Leave "action" blank if the action is ambiguous.
+
+    Output Format (JSON):
+
     {
-        "action": "create",
-        "event_title": "Team Meeting",
-        "date": "YYYY-MM-DD",
-        "event_time": "3 PM",
-        "attendees": ["john@example.com"],
-        "duration": "1 hour"
+    "input_timestamp": "YYYY-MM-DDTHH:MM:SS",
+    "current_day": "Day_of_the_week",
+    "action": "create | reschedule | cancel | (blank if ambiguous)",
+    "event_title": "string",
+    "event_time": "12-hour time format (e.g., '3 PM')",
+    "new_time": "12-hour time format (e.g., '4 PM') or blank",
+    "date": "YYYY-MM-DD",
+    "duration": "string or blank",
+    "location": "string or blank",
+    "attendees": ["list of attendees"],
+    "notes": "string or blank"
     }
-    """
+
+    Examples:
+
+        User Input:
+        "Team lunch tomorrow at 12:30 PM EST with the whole team at the rooftop café."
+        Current Date and Time: "2025-03-21T10:00:00"
+        Current Day of the Week: "Friday"
+
+        Output JSON:
+
+        {
+        "input_timestamp": "2025-03-21T10:00:00",
+        "current_day": "Friday",
+        "action": "create",
+        "event_title": "team lunch",
+        "event_time": "12:30 PM",
+        "new_time": "",
+        "date": "2025-03-22",
+        "duration": "",
+        "location": "rooftop café",
+        "attendees": ["the whole team"],
+        "notes": ""
+        }
+
+        User Input:
+        "Reschedule my 3 PM meeting to 4 PM tomorrow."
+        Current Date and Time: "2025-03-21T10:00:00"
+        Current Day of the Week: "Friday"
+
+        Output JSON:
+
+        {
+        "input_timestamp": "2025-03-21T10:00:00",
+        "current_day": "Friday",
+        "action": "reschedule",
+        "event_title": "meeting",
+        "event_time": "3 PM",
+        "new_time": "4 PM",
+        "date": "2025-03-22",
+        "duration": "",
+        "location": "",
+        "attendees": [],
+        "notes": ""
+        }
+
+        User Input:
+        "Cancel my 10 AM doctor's appointment on Friday."
+        Current Date and Time: "2025-03-18T15:00:00"
+        Current Day of the Week: "Tuesday"
+
+        Output JSON:
+
+    {
+    "input_timestamp": "2025-03-18T15:00:00",
+    "current_day": "Tuesday",
+    "action": "cancel",
+    "event_title": "doctor's appointment",
+    "event_time": "10 AM",
+    "new_time": "",
+    "date": "2025-03-21",
+    "duration": "",
+    "location": "",
+    "attendees": [],
+    "notes": ""
+    }
+
+
+        User Input: "Team lunch tomorrow at 12:30 PM EST with the whole team at the rooftop café."
+        Current Date and Time: "2025-03-21T10:00:00"
+
+        Output JSON:
+
+    {
+    "input_timestamp": "2025-03-21T10:00:00",
+    "action": "create",
+    "event_title": "team lunch",
+    "event_time": "12:30 PM",
+    "new_time": "",
+    "date": "2025-03-22",
+    "duration": "",
+    "location": "rooftop café",
+    "attendees": ["the whole team"],
+    "notes": ""
+    }
+
+    User Input: "Push my 10 AM meeting to 11:30 AM UTC tomorrow."
+    Current Date and Time: "2025-03-21T10:00:00"
+
+    Output JSON:
+
+    {
+    "input_timestamp": "2025-03-21T10:00:00",
+    "action": "reschedule",
+    "event_title": "meeting",
+    "event_time": "10 AM",
+    "new_time": "11:30 AM",
+    "date": "2025-03-22",
+    "duration": "",
+    "location": "",
+    "attendees": [],
+    "notes": ""
+    }
+
+
+    User input: "Create a team meeting tomorrow at 3 PM for 1 hour in the main office with Alice and Bob."  
+    Output:
+    {
+    "action": "create",
+    "event_title": "team meeting",
+    "event_time": "3 PM",
+    "new_time": "",
+    "date": "tomorrow",
+    "duration": "1 hour",
+    "location": "main office",
+    "attendees": ["Alice", "Bob"],
+    "notes": ""
+    }
+
+
+    User input: "Reschedule my 3 PM meeting to 4 PM tomorrow."  
+    Output:
+    {
+    "action": "reschedule",
+    "event_title": "meeting",
+    "event_time": "3 PM",
+    "new_time": "4 PM",
+    "date": "tomorrow",
+    "duration": "",
+    "location": "",
+    "attendees": [],
+    "notes": ""
+    }
+
+
+    User input: "Cancel my 10 AM doctor's appointment on Friday."  
+    Output:
+    {
+    "action": "cancel",
+    "event_title": "doctor's appointment",
+    "event_time": "10 AM",
+    "new_time": "",
+    "date": "Friday",
+    "duration": "",
+    "location": "",
+    "attendees": [],
+    "notes": ""
+    }
+"""
 
     # Send user input and system message to Nebius LLM
     response = client.chat.completions.create(
@@ -85,50 +304,99 @@ def get_nebius_llm_response(user_input):
     # Parse JSON from the Nebius LLM response
     response_content = response.choices[0].message.content
     try:
-        # Try parsing the LLM response as JSON
-        json_data = json.loads(response_content)
-        logging.info(f"Nebius LLM response: {response_content}")
+        logging.info(f"Nebius LLM raw response: {response_content}")
+        json_data = json.loads(response_content)  # Attempt to parse directly
+        logging.info(f"Nebius LLM parsed JSON: {json_data}")
         return json_data
     except json.JSONDecodeError:
-        # Fallback: Attempt to extract JSON if it's embedded in text or wrapped in backticks
-        json_match = re.search(r'```json\n(.*?)\n```', response_content, re.DOTALL)
+        logging.warning("Direct JSON parsing failed. Trying to extract JSON from triple backticks...")
+
+        # Fallback: Attempt to extract JSON from triple backticks
+        json_match = re.search(r'```(?:json)?\n(.*?)\n```', response_content, re.DOTALL)
         if json_match:
             try:
-                return json.loads(json_match.group(1))
-            except json.JSONDecodeError:
-                pass
+                extracted_json = json.loads(json_match.group(1))  # Parse the extracted JSON content
+                logging.info(f"Parsed JSON from triple backticks: {extracted_json}")
+                return extracted_json
+            except json.JSONDecodeError as e:
+                logging.error(f"Failed to parse JSON from extracted content: {e}")
 
-        logging.error(f"Failed to parse JSON from LLM response: {response_content}")
-        return {"error": "Could not parse response from LLM"}
+    logging.error(f"Failed to parse JSON from LLM response: {response_content}")
+    return {"error": "Could not parse response from LLM"}
+
+
+def detect_user_timezone():
+    """Detect user's timezone using their IP address via worldtimeapi.org."""
+    response = requests.get("http://worldtimeapi.org/api/ip")
+    if response.status_code == 200:
+        data = response.json()
+        logging.info(f"Detected timezone: {data.get('timezone', 'Etc/UTC')}\n") #DEBUG
+        return data.get('timezone', 'Etc/UTC')  # Returns timezone, e.g., "America/New_York"
+    logging.info(f"no timezone detected\n") #DEBUG
+    return 'Etc/UTC'
+
+
+def parse_duration(duration_str):
+    """Parse duration string into hours and minutes."""
+    hours, minutes = 0, 0
+    if 'hour' in duration_str:
+        try:
+            hours = int(duration_str.split()[0])
+        except (ValueError, IndexError):
+            pass
+    elif 'minute' in duration_str:
+        try:
+            minutes = int(duration_str.split()[0])
+        except (ValueError, IndexError):
+            pass
+    return hours, minutes
 
 
 def create_event(calendar_service, event_data):
-    """Create a new event in GCal."""
+    """Create a new event in Google Calendar, adjusting for the user's timezone."""
+    
+    # Detect user's timezone
+    user_timezone = detect_user_timezone()
+    
+    # Localize start and end datetime
+    local_tz = pytz.timezone(user_timezone)
+    try:
+        # Handles both "3 PM" and "3:00 PM" correctly
+        start_datetime = datetime.strptime(f"{event_data['date']} {event_data['event_time']}", "%Y-%m-%d %I:%M %p")
+    except ValueError:
+        # Fallback to handle times without minutes (like "3 PM")
+        if ' ' in event_data['event_time']:
+            start_datetime = datetime.strptime(f"{event_data['date']} {event_data['event_time']}", "%Y-%m-%d %I %p")
+        else:
+            raise ValueError(f"Invalid time format: {event_data['event_time']}")
+
+    start_datetime = local_tz.localize(start_datetime)
+
+    # Calculate end time
+    duration_hours, duration_minutes = parse_duration(event_data.get('duration', '1 hour'))
+    end_datetime = start_datetime + timedelta(hours=duration_hours, minutes=duration_minutes)
+
+    # Create the event dictionary
     event = {
         'summary': event_data.get('event_title', 'Untitled Event'),
         'location': event_data.get('location', ''),
         'description': event_data.get('notes', ''),
         'start': {
-            'dateTime': format_datetime(event_data.get('date'), event_data.get('event_time')),
-            'timeZone': 'Etc/UTC',
+            'dateTime': start_datetime.isoformat(),  # ISO format, timezone aware
+            'timeZone': user_timezone,
         },
         'end': {
-            'dateTime': calculate_end_time(
-                event_data.get('date'), 
-                event_data.get('event_time'),
-                event_data.get('duration', '1 hour')
-            ),
-            'timeZone': 'Etc/UTC',
+            'dateTime': end_datetime.isoformat(),
+            'timeZone': user_timezone,
         }
     }
-    
-    # Add attendees if given
+
+    # Add attendees if they have valid emails
     attendees = event_data.get('attendees', [])
     if attendees:
-        event['attendees'] = [{'email': attendee} if '@' in attendee else {'displayName': attendee} 
-                            for attendee in attendees]
-    
-    # Insert event into GCal
+        event['attendees'] = [{'email': attendee} for attendee in attendees if '@' in attendee]
+
+    # Insert the event into Google Calendar
     event = calendar_service.events().insert(calendarId='primary', body=event).execute()
     return event.get('id')
 

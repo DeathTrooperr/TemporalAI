@@ -1,8 +1,9 @@
-Flask
-google-auth
-google-auth-oauthlib
-google-auth-httplib2
-google-api-python-client
-openai
-python-dotenv
-requests
+Flask==2.0.3
+google-auth==2.3.3
+google-auth-oauthlib==0.4.6
+google-auth-httplib2==0.1.0
+google-api-python-client==2.26.1
+openai==0.10.2
+python-dotenv==0.19.2
+requests==2.26.0
+pytz==2021.3
