@@ -4,7 +4,7 @@ import { env } from '$env/dynamic/private';
 
 const GOOGLE_CLIENT_ID = env.GOOGLE_CLIENT_ID as string;
 const GOOGLE_CLIENT_SECRET = env.GOOGLE_CLIENT_SECRET as string;
-const REDIRECT_URI = env.REDIRECT_URI || 'https://your-app.pages.dev/login/auth/google';
+const REDIRECT_URI = env.REDIRECT_URI as string;
 const AUTH_REDIRECT = '/app';
 
 export async function GET({ url, cookies }) {
@@ -61,11 +61,10 @@ export async function GET({ url, cookies }) {
         // Step 5: Set auth cookie
         setAuthCookie(cookies, user);
 
-        // Step 6: Redirect to app
-        return redirect(302, AUTH_REDIRECT);
-
     } catch (error) {
-        console.error('OAuth error:', error);
+        console.error('Failed to authenticate with Google');
+        console.error('Error:', error);
         return redirect(302, '/login?error=auth_failed');
     }
+    return redirect(302, AUTH_REDIRECT);
 }

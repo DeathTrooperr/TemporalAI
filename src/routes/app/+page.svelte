@@ -62,12 +62,14 @@
                 <!-- User profile with dropdown - removed the three dots menu -->
                 <div class="relative">
                     <button
-                            on:click|stopPropagation={toggleUserMenu}
-                            class="cursor-pointer w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center hover:opacity-90 transition-opacity focus:ring-2 focus:ring-white/30 focus:outline-none"
-                            aria-expanded={userMenuOpen}
-                            aria-haspopup="true"
+                      on:click|stopPropagation={toggleUserMenu}
+                      class="cursor-pointer w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center hover:opacity-90 transition-opacity focus:ring-2 focus:ring-white/30 focus:outline-none bg-cover bg-center"
+                      style="background-image: url('{user.picture}');"
+                      aria-expanded={userMenuOpen}
+                      aria-haspopup="true"
                     >
-                        <span class="text-white font-bold text-xs md:text-sm">JD</span>
+                        <!-- Keep empty or add a fallback span that shows only if image fails to load -->
+                        <span class="text-white font-bold text-xs md:text-sm sr-only capitalize">{user.name[0]}</span>
                     </button>
 
                     <!-- Dropdown menu -->

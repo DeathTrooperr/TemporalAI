@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import {goto} from "$app/navigation";
+    import { goto } from "$app/navigation";
+    import { page } from "$app/stores";
 
     const appName = "TemporalAI";
     const backToHomeUrl = "/";
@@ -8,16 +9,49 @@
     let isLoading = false;
     let errorMessage = "";
 
+    // Check for error parameters when component mounts
+    onMount(() => {
+        // Get error type from URL if present
+        const errorType = $page.url.searchParams.get('error');
+
+        if (errorType) {
+            switch (errorType) {
+                case 'auth_failed':
+                    errorMessage = "Authentication failed. Please try again.";
+                    break;
+                case 'access_denied':
+                    errorMessage = "Access denied. You don't have permission to access this application.";
+                    break;
+                case 'session_expired':
+                    errorMessage = "Your session has expired. Please sign in again.";
+                    break;
+                case 'google_error':
+                    errorMessage = "Google authentication failed. Please try again.";
+                    break;
+                default:
+                    errorMessage = "An error occurred during login. Please try again.";
+            }
+        }
+    });
+
     const handleGoogleLogin = async () => {
         try {
             isLoading = true;
             await goto('/login/auth/google');
         } catch (error) {
             errorMessage = "Google authentication failed. Please try again.";
-            console.error("Login error:", error);
         } finally {
             isLoading = false;
         }
+    };
+
+    // Function to dismiss error message
+    const dismissError = () => {
+        errorMessage = "";
+        // Clear URL parameters
+        const url = new URL(window.location.href);
+        url.searchParams.delete('error');
+        history.replaceState({}, '', url);
     };
 </script>
 
@@ -51,17 +85,26 @@
 
                     <!-- Error message -->
                     {#if errorMessage}
-                        <div class="mb-6 bg-red-900/70 text-white p-3 rounded-lg text-sm">
+                        <div class="mb-6 bg-red-900/70 text-white p-3 rounded-lg text-sm relative">
+                            <button
+                              on:click={dismissError}
+                              class="absolute top-1/2 right-2 -translate-y-1/2 text-white/80 hover:text-white cursor-pointer"
+                              aria-label="Dismiss error"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
                             {errorMessage}
                         </div>
                     {/if}
 
                     <!-- Google Sign In Button -->
                     <button
-                            type="button"
-                            on:click={handleGoogleLogin}
-                            disabled={isLoading}
-                            class="cursor-pointer w-full flex items-center justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-gray-200 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                      type="button"
+                      on:click={handleGoogleLogin}
+                      disabled={isLoading}
+                      class="cursor-pointer w-full flex items-center justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-gray-900 bg-white hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-gray-200 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                         {#if isLoading}
                             <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

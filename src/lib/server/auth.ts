@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { dev } from '$app/environment';
+import { env } from '$env/dynamic/private';
 
 export interface UserSession {
     id: string;
@@ -8,7 +9,7 @@ export interface UserSession {
     picture: string;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET as string;
+const JWT_SECRET = env.JWT_SECRET as string;
 const COOKIE_NAME = 'session';
 const JWT_EXPIRES_IN = '7d';
 

@@ -54,5 +54,5 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
 
     // Continue with the request
-    return await resolve(event);
+    return resolve(event);
 };

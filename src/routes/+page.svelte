@@ -1,6 +1,5 @@
 <script lang="ts">
     const appName = "TemporalAI";
-    const loginPage = "/login";
     const githubRepo = "https://github.com/DeathTrooperr/TemporalAI";
 </script>
 
@@ -46,7 +45,7 @@
 
             <!-- CTA Buttons -->
             <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 justify-center">
-                <a href={loginPage} class="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold rounded-lg transition transform hover:scale-105">
+                <a href="/app" class="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold rounded-lg transition transform hover:scale-105">
                     Try Demo
                 </a>
                 <a href={githubRepo} target="_blank" class="px-8 py-4 bg-white/10 backdrop-blur-md hover:bg-white/20 text-white font-bold rounded-lg transition flex items-center justify-center">
