@@ -256,27 +256,37 @@ def cancel_event(calendar_service, event_data):
 
 
 def find_matching_events(calendar_service, title, date, time):
-    """Search for events in GCal."""
-    # Create time boundaries for the search
-    start_time = format_datetime(date, time)
-    end_time = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-    end_time += timedelta(hours=1)
-    end_time_str = end_time.isoformat().replace('+00:00', 'Z')
-    
-    # Query parameters for the search
-    query_params = {
-        'calendarId': 'primary',
-        'timeMin': start_time,
-        'timeMax': end_time_str,
-        'singleEvents': True,
-        'orderBy': 'startTime'
-    }
-    
-    # Add title to the query if given
-    if title:
-        query_params['q'] = title
-    
-    return calendar_service.events().list(**query_params).execute()
+    """Search for events in GCal, matching by title, date, and time."""
+
+    # Format start and end time to search in a 24-hour window around the specified date
+    start_time = format_datetime(date, "12:00 AM")
+    end_time = format_datetime(date, "11:59 PM")
+
+    # Search for events with the specified title within the time range
+    try:
+        events_result = calendar_service.events().list(
+            calendarId='primary',
+            timeMin=start_time,
+            timeMax=end_time,
+            q=title,  # Search for events containing the title string
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+
+        items = events_result.get('items', [])
+        if items:
+            # Optionally filter the events more rigorously by time if needed
+            matching_events = [
+                event for event in items if title.lower() in event.get('summary', '').lower()
+            ]
+            return {'items': matching_events}
+        else:
+            logging.info("No matching events found.")
+            return {'items': []}
+
+    except Exception as e:
+        logging.error(f"Failed to find events: {e}")
+        return {"error": f"Failed to find events: {str(e)}"}
 
 
 def format_datetime(date_str, time_str):
