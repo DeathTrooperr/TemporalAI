@@ -102,6 +102,7 @@
 			}
 
 			const data = await response.json();
+			console.log('Response from AI:', data);
 
 			// Remove the thinking message and add the actual response
 			messages = messages.filter(msg => !msg.isLoading);
@@ -110,7 +111,7 @@
 				{
 					id: messages.length + 1,
 					sender: 'ai',
-					text: data.response || "Sorry, I couldn't process your request.",
+					text: data.status === "success" ? data.message : "Sorry, I couldn't process your request.",
 					timestamp: new Date()
 				}
 			];

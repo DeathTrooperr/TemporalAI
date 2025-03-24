@@ -29,6 +29,7 @@ async function getCalendarService(token: string) {
 
 /**
  * Get structured calendar instruction from Nebius LLM
+ * Now handles both JSON format and plain text responses
  */
 async function getNebiusLlmResponse(userInput: string) {
 	try {
@@ -45,8 +46,9 @@ async function getNebiusLlmResponse(userInput: string) {
 		// In a real application, you would read this from a file
 		// For now, using a template literal for the system prompt
 		systemMessage += `
-You are a calendar assistant that extracts key information from user requests to manage calendar events.
-Analyze the user's message and extract the following information in JSON format:
+You are a calendar assistant that helps users manage their calendar events.
+
+For calendar management actions (create, reschedule, cancel events), extract key information and respond with JSON:
 
 {
   "action": "create|reschedule|cancel", // The action the user wants to perform
@@ -60,6 +62,7 @@ Analyze the user's message and extract the following information in JSON format:
   "new_time": "HH:MM AM/PM" // Only for reschedule actions, the new time
 }
 
+For general questions or conversations about calendar usage, respond with natural language text.
 Infer missing data when possible, and ensure all times are in AM/PM format.
 `;
 
@@ -75,7 +78,7 @@ Infer missing data when possible, and ensure all times are in AM/PM format.
 			]
 		});
 
-		// Parse JSON from the response
+		// Get response content
 		const responseContent = response.choices[0].message.content;
 		if (!responseContent) {
 			throw new Error('Empty response from LLM');
@@ -83,23 +86,42 @@ Infer missing data when possible, and ensure all times are in AM/PM format.
 
 		console.log(`Nebius LLM raw response: ${responseContent}`);
 
-		try {
-			// First attempt: Try to parse the entire response as JSON
-			return JSON.parse(responseContent);
-		} catch (error) {
-			console.log("Direct JSON parsing failed. Trying to extract JSON from triple backticks...");
+		// Try to parse as JSON if it appears to be structured data
+		if (responseContent.trim().startsWith('{') || /```(?:json)?\n\{/.test(responseContent)) {
+			try {
+				// First attempt: Try to parse the entire response as JSON
+				return {
+					type: 'json',
+					data: JSON.parse(responseContent)
+				};
+			} catch (error) {
+				console.log("Direct JSON parsing failed. Trying to extract JSON from triple backticks...");
 
-			// Second attempt: Try to extract JSON from markdown code blocks
-			const jsonMatch = responseContent.match(/```(?:json)?\n(.*?)\n```/s);
-			if (jsonMatch) {
-				try {
-					return JSON.parse(jsonMatch[1]);
-				} catch (e) {
-					console.error(`Failed to parse JSON from extracted content: ${e}`);
+				// Second attempt: Try to extract JSON from markdown code blocks
+				const jsonMatch = responseContent.match(/```(?:json)?\n(.*?)\n```/s);
+				if (jsonMatch) {
+					try {
+						return {
+							type: 'json',
+							data: JSON.parse(jsonMatch[1])
+						};
+					} catch (e) {
+						console.error(`Failed to parse JSON from extracted content: ${e}`);
+					}
 				}
-			}
 
-			throw new Error("Could not parse JSON from LLM response");
+				// Fall back to treating it as plain text if JSON parsing fails
+				return {
+					type: 'text',
+					data: responseContent
+				};
+			}
+		} else {
+			// It's a plain text response
+			return {
+				type: 'text',
+				data: responseContent
+			};
 		}
 	} catch (error) {
 		console.error("Error getting LLM response:", error);
@@ -399,11 +421,23 @@ export const POST: RequestHandler = async ({ request, cookies }: { request: Requ
 
 		console.log(`Received message: ${userMessage}`);
 
-		// Get structured data from Nebius LLM
-		const parsedData = await getNebiusLlmResponse(userMessage);
-		if (parsedData.error) {
-			return json(parsedData, { status: 500 });
+		// Get response from Nebius LLM
+		const llmResponse = await getNebiusLlmResponse(userMessage);
+		if (llmResponse.error) {
+			return json(llmResponse, { status: 500 });
 		}
+
+		// Handle plain text responses
+		if (llmResponse.type === 'text') {
+			return json({
+				status: "success",
+				action: "conversation",
+				message: llmResponse.data
+			});
+		}
+
+		// Handle JSON responses for calendar actions
+		const parsedData = llmResponse.data;
 
 		// Get the token from cookies
 		const user = getUserFromCookies(cookies);
