@@ -13,108 +13,101 @@
 	$: currentDate = $calendarStore.currentDate;
 	$: startOfWeek = getStartOfWeek(currentDate);
 
+	// Add these constants at the top of the script
+	const MIN_EVENT_WIDTH = 120; // Minimum width in pixels for readable events
+	const COLUMN_PADDING = 8; // Padding between events
+
 	function processEvents(events: CalendarEvent[]) {
-		// Sort events by duration (longest first), then by start time
+		// Sort events by start time (earlier first), then by duration (longer first)
 		const sortedEvents = [...events].sort((a, b) => {
+			const startDiff = a.start.getTime() - b.start.getTime();
+			if (startDiff !== 0) return startDiff;
+
 			const durationA = a.end.getTime() - a.start.getTime();
 			const durationB = b.end.getTime() - b.start.getTime();
-			if (durationB !== durationA) {
-				return durationB - durationA; // Longest events first
-			}
-			return a.start.getTime() - b.start.getTime(); // Earlier events first
+			return durationB - durationA; // Longer events first
 		});
 
-		// Track column assignments and processed events
-		const columns: Map<CalendarEvent, number> = new Map();
-		const columnCount: Map<number, number> = new Map();
+		// Track column assignments
+		const columns: Map<string, number> = new Map();
+		let maxColumn = 0;
 
-		// Process each event to determine its column
+		// Group events by their exact start time
+		const startTimeGroups = new Map<string, CalendarEvent[]>();
+
 		for (const event of sortedEvents) {
-			const overlappingEvents = sortedEvents.filter(
-				(e) => e !== event && event.start < e.end && event.end > e.start
-			);
+			const startKey = `${event.start.getHours()}:${event.start.getMinutes()}`;
+			if (!startTimeGroups.has(startKey)) {
+				startTimeGroups.set(startKey, []);
+			}
+			startTimeGroups.get(startKey)?.push(event);
+		}
 
-			// Check if this is a "container" event that fully contains other events
-			const isContainerEvent = overlappingEvents.some(
-				(e) => event.start <= e.start && event.end >= e.end
-			);
-
-			if (isContainerEvent) {
-				// Container events go to column 0 (background)
-				columns.set(event, 0);
-				columnCount.set(0, (columnCount.get(0) || 0) + 1);
+		// Process each start time group
+		for (const [startKey, groupEvents] of startTimeGroups) {
+			if (groupEvents.length > 1) {
+				// Multiple events at same start time - split horizontally
+				groupEvents.forEach((event, index) => {
+					columns.set(String(event.id), index);
+					maxColumn = Math.max(maxColumn, index);
+				});
 			} else {
-				// For partially overlapping events, find first available column
-				let column = 1; // Start from column 1 (column 0 is for container events)
-
-				// Find the first available column
-				const usedColumns = new Set<number>();
-				for (const e of overlappingEvents) {
-					if (columns.has(e)) {
-						usedColumns.add(columns.get(e)!);
-					}
-				}
-
-				while (usedColumns.has(column)) {
-					column++;
-				}
-
-				columns.set(event, column);
-				columnCount.set(column, (columnCount.get(column) || 0) + 1);
+				// Single event at this start time - use full width
+				columns.set(String(groupEvents[0].id), 0);
 			}
 		}
 
-		// Calculate max column for positioning
-		const maxColumn = Math.max(...Array.from(columns.values()), 0);
-
-		return sortedEvents.map((event) => {
-			const column = columns.get(event) || 0;
-			const isContainer = column === 0;
-
-			return {
-				event,
-				column,
-				isContainer,
-				maxColumn
-			};
-		});
+		return sortedEvents.map(event => ({
+			event,
+			column: columns.get(String(event.id)) || 0,
+			maxColumn: startTimeGroups.get(`${event.start.getHours()}:${event.start.getMinutes()}`)?.length || 1
+		}));
 	}
-
 	function getEventStyle(eventData: {
 		event: CalendarEvent;
 		column: number;
-		isContainer: boolean;
 		maxColumn: number;
 	}): string {
-		const { event, column, isContainer, maxColumn } = eventData;
+		const { event, column, maxColumn } = eventData;
 		const startHour = event.start.getHours();
 		const startMinute = event.start.getMinutes();
 		const endHour = event.end.getHours();
 		const endMinute = event.end.getMinutes();
 
 		const top = (startHour + startMinute / 60) * 64;
-		const height = Math.max((endHour + endMinute / 60 - (startHour + startMinute / 60)) * 64, 16);
+		const height = Math.max((endHour + endMinute / 60 - (startHour + startMinute / 60)) * 64, 32);
 
-		// Container events take full width, others share the available space
-		let width, left;
+		let width: string;
+		let left: string;
 
-		if (isContainer) {
+		// yo, fuck this alignment
+
+		if (maxColumn === 1) {
+			// No overlapping events - use full width
 			width = '100%';
 			left = '0%';
 		} else {
-			// Regular events divide the space
-			const totalColumns = maxColumn;
-			width = `${95 / totalColumns}%`;
-			left = `${(column - 1) * (95 / totalColumns) + 2.5}%`;
+			// Has overlapping events - split into columns
+			const columnWidth = 100 / (maxColumn);
+			width = `${columnWidth}%`;
+			left = `${column * columnWidth}%`;
 		}
 
-		return `top: ${top}px; height: ${height}px; left: ${left}; width: ${width}; background-color: ${event.color || '#3b82f6'};`;
+		return `
+			position: absolute;
+			top: ${top}px;
+			height: ${height}px;
+			left: ${left};
+			width: ${width};
+			background-color: ${event.color || '#3b82f6'};
+			opacity: 0.9;
+			z-index: 10;
+		`;
 	}
 
 	// Process events for each day of the week
 	$: dayProcessedEvents = Array.from({ length: 7 }, (_, dayOffset) => {
-		const dayDate = new Date(startOfWeek);
-		dayDate.setDate(startOfWeek.getDate() + dayOffset);
+		const dayDate = new Date(startOfWeek.getTime() + (dayOffset * 24 * 60 * 60 * 1000));
 		const dayEvents = getEventsForDate(events, dayDate);
 		return processEvents(dayEvents);
 	});
@@ -143,12 +136,11 @@
 
 		<!-- Days of the week -->
 		{#each Array.from({ length: 7 }, (_, i) => i) as dayOffset}
-			{@const dayDate = new Date(startOfWeek)}
-			{@const _ = dayDate.setDate(startOfWeek.getDate() + dayOffset)}
+			{@const dayDate = new Date(startOfWeek.getTime() + (dayOffset * 24 * 60 * 60 * 1000))}
 			{@const isCurrentDay =
-				dayDate.getDate() === new Date().getDate() &&
-				dayDate.getMonth() === new Date().getMonth() &&
-				dayDate.getFullYear() === new Date().getFullYear()}
+			dayDate.getDate() === new Date().getDate() &&
+			dayDate.getMonth() === new Date().getMonth() &&
+			dayDate.getFullYear() === new Date().getFullYear()}
 			{@const processedDayEvents = dayProcessedEvents[dayOffset]}
 
 			<div class="day-column border-r border-gray-800">
@@ -173,9 +165,7 @@
 					{#each processedDayEvents as eventData}
 						{@const event = eventData.event}
 						<div
-							class="absolute overflow-hidden rounded-md p-1 text-white {eventData.isContainer
-								? 'opacity-80'
-								: ''}"
+							class="absolute overflow-hidden rounded-md p-1 text-white"
 							style={getEventStyle(eventData)}
 						>
 							<div class="truncate text-xs font-medium">{event.title}</div>
@@ -191,11 +181,11 @@
 </div>
 
 <style>
-	.week-view {
-		min-height: 1536px; /* 24 hours × 64px */
-	}
+    .week-view {
+        min-height: 1536px; /* 24 hours × 64px */
+    }
 
-	.day-column {
-		min-width: 120px;
-	}
+    .day-column {
+        min-width: 120px;
+    }
 </style>

@@ -40,12 +40,12 @@
 
 		// Initialize all events with no shifting and calculate heights
 		for (const event of sortedEvents) {
-			eventShifts.set(event.id, 0);
+			eventShifts.set(String(event.id), 0);
 
 			// Calculate natural height based on event duration
 			const durationInHours = (event.end.getTime() - event.start.getTime()) / (1000 * 60 * 60);
 			const naturalHeight = durationInHours * HOUR_HEIGHT;
-			eventHeights.set(event.id, Math.max(naturalHeight, DEFAULT_EVENT_MIN_HEIGHT));
+			eventHeights.set(String(event.id), Math.max(naturalHeight, DEFAULT_EVENT_MIN_HEIGHT));
 		}
 
 		// Track overlapping groups to manage shift levels
@@ -79,7 +79,7 @@
 
 		// Return processed events with position information
 		return sortedEvents.map(event => {
-			const shiftLevel = eventShifts.get(event.id) || 0;
+			const shiftLevel = eventShifts.get(String(event.id)) || 0;
 			return { event, shiftLevel };
 		});
 	}

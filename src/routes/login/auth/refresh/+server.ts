@@ -8,8 +8,7 @@ export async function GET({ cookies }) {
 		return json({ success: false, message: 'Not authenticated' }, { status: 401 });
 	}
 
-	// Issue a new token with updated expiry time
-	refreshUserSession(cookies);
+	await refreshUserSession(cookies);
 
 	return json({ success: true, message: 'Token refreshed successfully' });
 }
