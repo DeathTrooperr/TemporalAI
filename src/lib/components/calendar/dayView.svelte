@@ -1,146 +1,191 @@
 <script lang="ts">
-    import { calendarStore } from '../../stores/calendarStore.js';
-    import {
-        getEventsForDate,
-        formatTime
-    } from '../../utils/dateUtils.js';
-    import { createStyleString } from '../../utils/styleUtils.js';
-    import type { CalendarEvent } from '../../types/calendar.js';
+	import { calendarStore } from '../../stores/calendarStore.js';
+	import { getEventsForDate, formatTime } from '../../utils/dateUtils.js';
+	import { createStyleString } from '../../utils/styleUtils.js';
+	import type { CalendarEvent } from '../../types/calendar.js';
 
-    export let events: CalendarEvent[] = [];
+	export let events: CalendarEvent[] = [];
 
-    $: currentDate = $calendarStore.currentDate;
-    $: dayEvents = getEventsForDate(events, currentDate);
-    $: processedEvents = processEvents(dayEvents);
+	// Default height for an event with title and time
+	const DEFAULT_EVENT_MIN_HEIGHT = 84; // 64px + 20px extra
+	// Hour height in pixels (matches the grid)
+	const HOUR_HEIGHT = 64; // px
+	// Default width for shifted events (percentage of container)
+	const SHIFTED_EVENT_WIDTH = 85; // %
+	// Amount to shift each overlapping event (percentage of container)
+	const EVENT_SHIFT_OFFSET = 15; // %
+	// Minimum time overlap (in minutes) required to cause a shift
+	const MIN_OVERLAP_FOR_SHIFT = 20; // minutes
+	// Minimum required content height (title + time) to avoid shifting
+	const MIN_CONTENT_HEIGHT = 48; // px
+	// Padding inside event cards (px)
+	const EVENT_PADDING = 10; // px
 
-    function processEvents(events: CalendarEvent[]) {
-        // Sort events by duration (longest first), then by start time
-        const sortedEvents = [...events].sort((a, b) => {
-            const durationA = a.end.getTime() - a.start.getTime();
-            const durationB = b.end.getTime() - b.start.getTime();
-            if (durationB !== durationA) {
-                return durationB - durationA; // Longest events first
-            }
-            return a.start.getTime() - b.start.getTime(); // Earlier events first
-        });
+	$: currentDate = $calendarStore.currentDate;
+	$: dayEvents = getEventsForDate(events, currentDate);
+	$: processedEvents = processEvents(dayEvents);
 
-        // Track column assignments and processed events
-        const columns: Map<CalendarEvent, number> = new Map();
-        const columnCount: Map<number, number> = new Map();
+	interface ProcessedEvent {
+		event: CalendarEvent;
+		shiftLevel: number;
+	}
 
-        // Process each event to determine its column
-        for (const event of sortedEvents) {
-            const overlappingEvents = sortedEvents.filter(e =>
-                e !== event &&
-                event.start < e.end &&
-                event.end > e.start
-            );
+	function processEvents(events: CalendarEvent[]): ProcessedEvent[] {
+		// Sort events by start time (earlier first)
+		const sortedEvents = [...events].sort((a, b) => a.start.getTime() - b.start.getTime());
 
-            // Check if this is a "container" event that fully contains other events
-            const isContainerEvent = overlappingEvents.some(e =>
-                event.start <= e.start && event.end >= e.end
-            );
+		// Create an array to track events that significantly overlap and need shifting
+		const eventShifts = new Map<string, number>();
+		const eventHeights = new Map<string, number>();
 
-            if (isContainerEvent) {
-                // Container events go to column 0 (background)
-                columns.set(event, 0);
-                columnCount.set(0, (columnCount.get(0) || 0) + 1);
-            } else {
-                // For partially overlapping events, find first available column
-                let column = 1; // Start from column 1 (column 0 is for container events)
+		// Initialize all events with no shifting and calculate heights
+		for (const event of sortedEvents) {
+			eventShifts.set(event.id, 0);
 
-                // Find the first available column
-                const usedColumns = new Set<number>();
-                for (const e of overlappingEvents) {
-                    if (columns.has(e)) {
-                        usedColumns.add(columns.get(e)!);
-                    }
-                }
+			// Calculate natural height based on event duration
+			const durationInHours = (event.end.getTime() - event.start.getTime()) / (1000 * 60 * 60);
+			const naturalHeight = durationInHours * HOUR_HEIGHT;
+			eventHeights.set(event.id, Math.max(naturalHeight, DEFAULT_EVENT_MIN_HEIGHT));
+		}
 
-                while (usedColumns.has(column)) {
-                    column++;
-                }
+		// Analyze each event's overlap with prior events
+		for (let i = 0; i < sortedEvents.length; i++) {
+			const currentEvent = sortedEvents[i];
+			const currentEventHeight = eventHeights.get(currentEvent.id) || DEFAULT_EVENT_MIN_HEIGHT;
 
-                columns.set(event, column);
-                columnCount.set(column, (columnCount.get(column) || 0) + 1);
-            }
-        }
+			// Check earlier events for significant overlapping
+			for (let j = 0; j < i; j++) {
+				const earlierEvent = sortedEvents[j];
+				const earlierEventHeight = eventHeights.get(earlierEvent.id) || DEFAULT_EVENT_MIN_HEIGHT;
 
-        // Calculate max column for positioning
-        const maxColumn = Math.max(...Array.from(columns.values()), 0);
+				// Check if events overlap
+				const overlapStart = Math.max(currentEvent.start.getTime(), earlierEvent.start.getTime());
+				const overlapEnd = Math.min(currentEvent.end.getTime(), earlierEvent.end.getTime());
+				const overlapDuration = (overlapEnd - overlapStart) / (60 * 1000); // in minutes
 
-        return sortedEvents.map(event => {
-            const column = columns.get(event) || 0;
-            const isContainer = column === 0;
+				// Calculate the overlapping height in pixels
+				const overlapHeightInPixels = (overlapDuration / 60) * HOUR_HEIGHT;
 
-            return {
-                event,
-                column,
-                isContainer,
-                maxColumn
-            };
-        });
-    }
+				// Only shift if both:
+				// 1. Overlap is significant enough (time-wise)
+				// 2. The overlap would hide important content (height-wise)
+				if (
+					overlapDuration >= MIN_OVERLAP_FOR_SHIFT &&
+					overlapHeightInPixels > MIN_CONTENT_HEIGHT
+				) {
+					// If the earlier event is already shifted, shift the current event more
+					const earlierEventShift = eventShifts.get(earlierEvent.id) || 0;
+					const currentEventShift = eventShifts.get(currentEvent.id) || 0;
 
-    function getEventStyle(eventData: { event: CalendarEvent, column: number, isContainer: boolean, maxColumn: number }): string {
-        const { event, column, isContainer, maxColumn } = eventData;
-        const startHour = event.start.getHours();
-        const startMinute = event.start.getMinutes();
-        const endHour = event.end.getHours();
-        const endMinute = event.end.getMinutes();
+					// Ensure we shift more than the overlapping event
+					if (earlierEventShift >= currentEventShift) {
+						eventShifts.set(currentEvent.id, earlierEventShift + 1);
+					}
+				}
+			}
+		}
 
-        const top = (startHour + startMinute / 60) * 64;
-        const height = ((endHour + endMinute / 60) - (startHour + startMinute / 60)) * 64;
+		// Return processed events with position information
+		return sortedEvents.map(event => {
+			const shiftLevel = eventShifts.get(event.id) || 0;
+			return { event, shiftLevel };
+		});
+	}
 
-        // Container events take full width, others share the available space
-        let width, left;
+	function getEventStyle(eventData: ProcessedEvent): string {
+		const { event, shiftLevel } = eventData;
+		const startHour = event.start.getHours();
+		const startMinute = event.start.getMinutes();
+		const endHour = event.end.getHours();
+		const endMinute = event.end.getMinutes();
 
-        if (isContainer) {
-            width = '100%';
-            left = '0%';
-        } else {
-            // Regular events divide the space
-            const totalColumns = maxColumn;
-            width = `${100 / totalColumns}%`;
-            left = `${(column - 1) * (100 / totalColumns)}%`;
-        }
+		// Calculate top position based on time
+		const top = (startHour + startMinute / 60) * HOUR_HEIGHT;
 
-        return `top: ${top}px; height: ${height}px; background-color: ${event.color}; width: ${width}; left: ${left}; z-index: ${isContainer ? 1 : 2};`;
-    }
+		// Calculate height based on event duration
+		const durationInHours = ((endHour * 60 + endMinute) - (startHour * 60 + startMinute)) / 60;
+		const baseHeight = durationInHours * HOUR_HEIGHT;
+
+		// Apply minimum height
+		const height = Math.max(baseHeight, DEFAULT_EVENT_MIN_HEIGHT);
+
+		// Calculate width and left position based on shift level
+		let width: string;
+		let left: string;
+
+		if (shiftLevel === 0) {
+			// No shift needed, use full width
+			width = '100%';
+			left = '0%';
+		} else {
+			// Needs shifting, use slightly reduced width
+			width = `${SHIFTED_EVENT_WIDTH}%`;
+			left = `${shiftLevel * EVENT_SHIFT_OFFSET}%`;
+		}
+
+		const zIndex = shiftLevel + 2; // Ensure overlapping events have increasing z-index
+
+		return `
+			top: ${top}px;
+			height: ${height}px;
+			background-color: ${event.color};
+			width: ${width};
+			left: ${left};
+			z-index: ${zIndex};
+			padding: ${EVENT_PADDING}px;
+		`;
+	}
 </script>
 
 <div class="day-view overflow-auto pt-4">
-    <div class="grid grid-cols-[60px_1fr] gap-2">
-        <!-- Time column -->
-        <div class="time-column sticky left-0 bg-gray-900 z-10">
-            {#each Array.from({ length: 24 }, (_, i) => i) as hour}
-                <div class="h-16 text-gray-500 text-xs flex justify-end pr-2">
-                    <div class="relative" style="top: -6px;">
-                        {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
-                    </div>
-                </div>
-            {/each}
-        </div>
+	<div class="grid grid-cols-[60px_1fr] gap-2">
+		<!-- Time column -->
+		<div class="time-column sticky left-0 z-10 bg-gray-900">
+			{#each Array.from({ length: 24 }, (_, i) => i) as hour}
+				<div class="flex h-16 justify-end pr-2 text-xs text-gray-500">
+					<div class="relative" style="top: -6px;">
+						{hour === 0
+							? '12 AM'
+							: hour < 12
+								? `${hour} AM`
+								: hour === 12
+									? '12 PM'
+									: `${hour - 12} PM`}
+					</div>
+				</div>
+			{/each}
+		</div>
 
-        <!-- Schedule column -->
-        <div class="schedule-column relative">
-            {#each Array.from({ length: 24 }, (_, i) => i) as hour}
-                <div class="h-16 border-t border-gray-800"></div>
-            {/each}
+		<!-- Schedule column -->
+		<div class="schedule-column relative">
+			{#each Array.from({ length: 24 }, (_, i) => i) as hour}
+				<div class="h-16 border-t border-gray-800"></div>
+			{/each}
 
-            <!-- Events handling -->
-            {#each processedEvents as eventData (eventData.event.id)}
-                <div
-                        class="absolute rounded-lg p-2 overflow-hidden"
-                        class:opacity-80={eventData.isContainer}
-                        style={getEventStyle(eventData)}
-                >
-                    <div class="text-white font-medium truncate">{eventData.event.title}</div>
-                    <div class="text-white text-xs opacity-80 truncate">
-                        {formatTime(eventData.event.start)} - {formatTime(eventData.event.end)}
-                    </div>
-                </div>
-            {/each}
-        </div>
-    </div>
+			<!-- Events handling -->
+			{#each processedEvents as eventData (eventData.event.id)}
+				<div
+					class="absolute overflow-hidden rounded-lg transition-all"
+					class:event-card={true}
+					style={getEventStyle(eventData)}
+				>
+					<div class="truncate font-medium text-white">{eventData.event.title}</div>
+					<div class="mt-1 truncate text-xs text-white opacity-80">
+						{formatTime(eventData.event.start)} - {formatTime(eventData.event.end)}
+					</div>
+				</div>
+			{/each}
+		</div>
+	</div>
 </div>
+
+<style>
+    .event-card {
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+        box-sizing: border-box;
+    }
+
+    .event-card > div {
+        line-height: 1.4;
+    }
+</style>

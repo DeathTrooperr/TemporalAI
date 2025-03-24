@@ -27,12 +27,12 @@
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
-			"svelte": "./dist/index.js",
-			"default": "./dist/index.js"
+			"svelte": "./dist/index.js"
 		}
 	},
 	"peerDependencies": {
-		"@sveltejs/kit": "^2.0.0"
+		"@sveltejs/kit": "^2.0.0",
+		"svelte": "^5.0.0"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.2.5",
@@ -45,6 +45,7 @@
 		"@tailwindcss/typography": "^0.5.15",
 		"@tailwindcss/vite": "^4.0.0",
 		"@types/jsonwebtoken": "^9.0.9",
+		"@types/luxon": "^3.4.2",
 		"eslint": "^9.18.0",
 		"eslint-config-prettier": "^10.0.1",
 		"eslint-plugin-svelte": "^3.0.0",
@@ -65,10 +66,10 @@
 	],
 	"dependencies": {
 		"esm-env": "^1.2.2",
+		"googleapis": "^148.0.0",
 		"jsonwebtoken": "^9.0.2",
+		"luxon": "^3.5.0",
+		"openai": "^4.89.0",
 		"svelte-transition": "^0.0.17"
-	},
-	"engines": {
-		"node": ">=18.18.0"
 	}
 }

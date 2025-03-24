@@ -3,29 +3,29 @@
 @plugin '@tailwindcss/typography';
 
 #app {
-    background-image: url('https://images.unsplash.com/photo-1557264337-e8a93017fe92?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3');
+	background-image: url('https://images.unsplash.com/photo-1557264337-e8a93017fe92?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3');
 }
 
 /* Custom scrollbar styling to match the theme */
 #app * {
-    scrollbar-width: thin;
-    scrollbar-color: #8b5cf6 #1f2937;
+	scrollbar-width: thin;
+	scrollbar-color: #8b5cf6 #1f2937;
 }
 
 #app *::-webkit-scrollbar {
-    width: 8px;
+	width: 8px;
 }
 
 #app *::-webkit-scrollbar-track {
-    background: #1f2937; /* gray-800 */
-    border-radius: 4px;
+	background: #1f2937; /* gray-800 */
+	border-radius: 4px;
 }
 
 #app *::-webkit-scrollbar-thumb {
-    background: linear-gradient(to bottom, #3b82f6, #8b5cf6); /* blue-500 to purple-600 */
-    border-radius: 4px;
+	background: linear-gradient(to bottom, #3b82f6, #8b5cf6); /* blue-500 to purple-600 */
+	border-radius: 4px;
 }
 
 #app *::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(to bottom, #60a5fa, #a78bfa); /* blue-400 to purple-500 */
+	background: linear-gradient(to bottom, #60a5fa, #a78bfa); /* blue-400 to purple-500 */
 }

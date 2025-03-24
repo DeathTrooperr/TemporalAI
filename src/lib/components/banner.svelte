@@ -29,19 +29,27 @@
 </script>
 
 {#if visible}
-	<div class="fixed top-4 left-0 right-0 z-0 flex justify-center">
-		<div class="z-50 max-w-md bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-6 rounded-lg shadow-xl backdrop-blur-sm flex items-center space-x-3"
-				 class:banner-visible={!isFading}
-				 class:banner-fading={isFading}>
+	<div class="fixed top-4 right-0 left-0 z-0 flex justify-center">
+		<div
+			class="z-50 flex max-w-md items-center space-x-3 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-3 text-white shadow-xl backdrop-blur-sm"
+			class:banner-visible={!isFading}
+			class:banner-fading={isFading}
+		>
 			<div class="flex-grow text-center">
 				<p class="font-medium">{message}</p>
 			</div>
 			<button
-				class="text-white hover:text-gray-200 focus:outline-none flex-shrink-0 cursor-pointer"
+				class="flex-shrink-0 cursor-pointer text-white hover:text-gray-200 focus:outline-none"
 				on:click={close}
-				aria-label="Close banner">
-				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+				aria-label="Close banner"
+			>
+				<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M6 18L18 6M6 6l12 12"
+					></path>
 				</svg>
 			</button>
 		</div>
@@ -49,22 +57,22 @@
 {/if}
 
 <style>
-    @keyframes fadeOut {
-        0% {
-            opacity: 1;
-        }
-        100% {
-            opacity: 0;
-        }
-    }
+	@keyframes fadeOut {
+		0% {
+			opacity: 1;
+		}
+		100% {
+			opacity: 0;
+		}
+	}
 
-    .banner-visible {
-        opacity: 1;
-        transition: opacity 2s ease-out;
-    }
+	.banner-visible {
+		opacity: 1;
+		transition: opacity 2s ease-out;
+	}
 
-    .banner-fading {
-        opacity: 0;
-        transition: opacity 2s ease-out;
-    }
+	.banner-fading {
+		opacity: 0;
+		transition: opacity 2s ease-out;
+	}
 </style>
