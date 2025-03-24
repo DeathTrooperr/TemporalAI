@@ -1,4 +1,4 @@
-import type { CalendarEvent } from '../types/calendar.js';
+import type { CalendarEvent } from '$lib/core/types/calendar.js';
 
 // This would typically come from an API
 export function getInitialEvents(year: number, month: number): CalendarEvent[] {

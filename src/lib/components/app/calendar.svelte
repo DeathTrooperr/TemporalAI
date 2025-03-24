@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getInitialEvents } from '../data/events.js';
-	import type { CalendarEvent } from '../types/calendar.js';
+	import { getInitialEvents } from '../../data/events.js';
+	import type { CalendarEvent } from '$lib/core/types/calendar.js';
 
-	import CalendarHeader from './calendar/calendarHeader.svelte';
-	import MonthView from './calendar/monthView.svelte';
-	import WeekView from './calendar/weekView.svelte';
-	import DayView from './calendar/dayView.svelte';
-	import { calendarStore } from '../stores/calendarStore.js';
+	import CalendarHeader from '$lib/components/app/calendar/calendarHeader.svelte';
+	import MonthView from '$lib/components/app/calendar/monthView.svelte';
+	import WeekView from '$lib/components/app/calendar/weekView.svelte';
+	import DayView from '$lib/components/app/calendar/dayView.svelte';
+	import { calendarStore } from '../../stores/calendarStore.js';
 
 	$: view = $calendarStore.currentView;
 	$: date = $calendarStore.currentDate;

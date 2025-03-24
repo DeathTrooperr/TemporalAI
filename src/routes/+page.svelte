@@ -1,7 +1,7 @@
 <script lang="ts">
 	export let data;
 	import { onMount } from 'svelte';
-	import Banner from '$lib/components/banner.svelte';
+	import Banner from '$lib/components/ui/banner.svelte';
 
 	const appName = 'TemporalAI';
 	const githubRepo = 'https://github.com/DeathTrooperr/TemporalAI';

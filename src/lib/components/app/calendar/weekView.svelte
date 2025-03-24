@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { calendarStore } from '../../stores/calendarStore.js';
+	import { calendarStore } from '../../../stores/calendarStore.js';
 	import {
 		getDayName,
 		getEventsForDate,
 		formatTime,
 		getStartOfWeek
-	} from '../../utils/dateUtils.js';
-	import type { CalendarEvent } from '../../types/calendar.js';
+	} from '../../../utils/dateUtils.js';
+	import type { CalendarEvent } from '$lib/core/types/calendar.js';
 
 	export let events: CalendarEvent[] = [];
 
@@ -121,7 +121,7 @@
 			<!-- Header spacer -->
 			{#each Array.from({ length: 24 }, (_, i) => i) as hour}
 				<div class="relative h-16">
-					<div class="absolute top-[-9px] right-2 text-xs text-gray-500">
+					<div class="absolute top-0 right-2 text-xs text-gray-500">
 						{hour === 0
 							? '12 AM'
 							: hour < 12
@@ -182,7 +182,7 @@
 
 <style>
     .week-view {
-        min-height: 1536px; /* 24 hours × 64px */
+        min-height: 1600px; /* Increased from 1536px to accommodate all hours */
     }
 
     .day-column {

@@ -1,8 +1,8 @@
 <script lang="ts">
 	export let data;
-	import Calendar from '$lib/components/calendar.svelte';
-	import Chatbox from '$lib/components/chatbox.svelte';
-	import Banner from '$lib/components/banner.svelte';
+	import Calendar from '$lib/components/app/calendar.svelte';
+	import Chatbox from '$lib/components/app/chatbox.svelte';
+	import Banner from '$lib/components/ui/banner.svelte';
 	import { goto } from '$app/navigation';
 
 	type User = {

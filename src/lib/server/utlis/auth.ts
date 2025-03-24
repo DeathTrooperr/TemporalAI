@@ -1,6 +1,6 @@
 import jwt, { type JwtPayload } from 'jsonwebtoken';
 import { env } from '$env/dynamic/private';
-import type { UserSession } from '../interfaces/userSession.js';
+import type { UserSession } from '$lib/core/interfaces/userSession.js';
 import type { Cookies } from '@sveltejs/kit';
 import { DEV } from 'esm-env';
 import crypto from 'crypto';

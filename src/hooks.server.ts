@@ -1,5 +1,5 @@
 import { redirect, type Handle } from '@sveltejs/kit';
-import { getUserFromCookies } from '$lib/server/auth.js';
+import { getUserFromCookies } from '$lib/server/utlis/auth.js';
 
 // List of protected routes that require authentication
 const PROTECTED_ROUTES = ['/app', '/api'];

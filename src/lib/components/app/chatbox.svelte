@@ -1,7 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	let messages = [
+	// Define types for our chat messages
+	interface ChatMessage {
+		id: number;
+		sender: 'user' | 'ai';
+		text: string;
+		timestamp: Date;
+		isLoading?: boolean;
+	}
+
+	let messages: ChatMessage[] = [
 		{
 			id: 1,
 			sender: 'ai',
@@ -11,64 +20,82 @@
 	];
 
 	let newMessage = '';
-	let chatContainer;
-	let messageInput;
+	let chatContainer: HTMLElement;
+	let messageInput: HTMLTextAreaElement;
 	let isAtBottom = true;
 
 	// Example suggested queries
-	const suggestedQueries = [
+	const suggestedQueries: string[] = [
 		'Schedule a meeting tomorrow at 2 PM',
 		'Show me my appointments for next week',
 		'Reschedule my 3 PM meeting to 4 PM',
 		"What's on my calendar for today?"
 	];
 
+	// Constants for UI behavior
+	const TEXTAREA_MAX_HEIGHT = 150; // pixels
+	const SCROLL_THRESHOLD = 20; // pixels from bottom to consider "at bottom"
+	const ERROR_MESSAGE = "Sorry, I encountered an error while processing your request. Please try again later.";
+	const FALLBACK_MESSAGE = "Sorry, I couldn't process your request.";
+
 	// Auto-resize the textarea based on content
-	function resizeTextarea() {
+	function resizeTextarea(): void {
 		if (!messageInput) return;
 
 		// Reset height to measure the scrollHeight correctly
 		messageInput.style.height = 'auto';
 
 		// Set the height based on content (with a maximum height cap)
-		const maxHeight = 150; // maximum height in pixels
-		const newHeight = Math.min(messageInput.scrollHeight, maxHeight);
+		const newHeight = Math.min(messageInput.scrollHeight, TEXTAREA_MAX_HEIGHT);
 		messageInput.style.height = `${newHeight}px`;
 
 		// Add scrollbar if content exceeds max height
-		messageInput.style.overflowY = newHeight === maxHeight ? 'auto' : 'hidden';
+		messageInput.style.overflowY = newHeight === TEXTAREA_MAX_HEIGHT ? 'auto' : 'hidden';
 	}
 
-	// Check if user is at bottom of chat
-	function checkIfAtBottom() {
+	// Scroll management
+	function checkIfAtBottom(): void {
 		if (!chatContainer) return;
 
-		const threshold = 20; // pixels from bottom to consider "at bottom"
 		const scrollBottom =
 			chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight;
-		isAtBottom = scrollBottom < threshold;
+		isAtBottom = scrollBottom < SCROLL_THRESHOLD;
 	}
 
-	function handleScroll() {
+	function handleScroll(): void {
 		checkIfAtBottom();
 	}
 
-	async function sendMessage() {
-		if (newMessage.trim() === '') return;
+	function scrollToBottom(): void {
+		if (!chatContainer) return;
+		chatContainer.scrollTop = chatContainer.scrollHeight;
+	}
 
-		// Add user message
+	// Message management
+	function addMessage(messageData: Partial<ChatMessage> & { text: string; sender: 'user' | 'ai' }): void {
+		const newId = messages.length + 1;
 		messages = [
 			...messages,
 			{
-				id: messages.length + 1,
-				sender: 'user',
-				text: newMessage,
-				timestamp: new Date()
+				id: newId,
+				timestamp: new Date(),
+				...messageData
 			}
 		];
+		return;
+	}
 
-		// Clear input
+	function removeLoadingMessages(): void {
+		messages = messages.filter(msg => !msg.isLoading);
+	}
+
+	// Send message functionality
+	async function sendMessage(): Promise<void> {
+		if (newMessage.trim() === '') return;
+
+		// Store and clear user message
 		const userMessage = newMessage;
+		addMessage({ sender: 'user', text: userMessage });
 		newMessage = '';
 
 		// Reset textarea height after clearing
@@ -76,17 +103,7 @@
 
 		try {
 			// Add temporary "thinking" message
-			const thinkingId = messages.length + 1;
-			messages = [
-				...messages,
-				{
-					id: thinkingId,
-					sender: 'ai',
-					text: "Thinking...",
-					isLoading: true,
-					timestamp: new Date()
-				}
-			];
+			addMessage({ sender: 'ai', text: "...", isLoading: true });
 
 			// Make request to our AI endpoint
 			const response = await fetch('/api/ai', {
@@ -102,38 +119,24 @@
 			}
 
 			const data = await response.json();
-			console.log('Response from AI:', data);
 
-			// Remove the thinking message and add the actual response
-			messages = messages.filter(msg => !msg.isLoading);
-			messages = [
-				...messages,
-				{
-					id: messages.length + 1,
-					sender: 'ai',
-					text: data.status === "success" ? data.message : "Sorry, I couldn't process your request.",
-					timestamp: new Date()
-				}
-			];
+			// Remove loading message and add the actual response
+			removeLoadingMessages();
+			addMessage({
+				sender: 'ai',
+				text: data.status === "success" ? data.message : FALLBACK_MESSAGE
+			});
 		} catch (error) {
 			console.error('Error communicating with AI:', error);
 
 			// Replace thinking message with error message
-			messages = messages.filter(msg => !msg.isLoading);
-			messages = [
-				...messages,
-				{
-					id: messages.length + 1,
-					sender: 'ai',
-					text: "Sorry, I encountered an error while processing your request. Please try again later.",
-					timestamp: new Date()
-				}
-			];
+			removeLoadingMessages();
+			addMessage({ sender: 'ai', text: ERROR_MESSAGE });
 		}
 	}
 
 	// Handle key press events in the textarea
-	function handleKeyDown(event) {
+	function handleKeyDown(event: KeyboardEvent): void {
 		// If Enter is pressed without Shift key, submit the message
 		if (event.key === 'Enter' && !event.shiftKey) {
 			event.preventDefault(); // Prevent adding a new line
@@ -142,37 +145,35 @@
 		// If Shift+Enter is pressed, allow the default behavior (new line)
 	}
 
-	function sendSuggestedQuery(query) {
+	function sendSuggestedQuery(query: string): void {
 		newMessage = query;
 		setTimeout(resizeTextarea, 0);
 		sendMessage();
 	}
 
-	// Auto scroll to bottom when new messages arrive, but only if already at bottom
-	$: if (messages && chatContainer && isAtBottom) {
-		setTimeout(() => {
-			chatContainer.scrollTop = chatContainer.scrollHeight;
-		}, 0);
+	// Format time for messages
+	function formatTime(date: Date): string {
+		return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 	}
 
-	// Watch for changes to newMessage to resize textarea
-	$: if (newMessage !== undefined) {
-		setTimeout(resizeTextarea, 0);
-	}
-
-	// Initialize scroll position and check status
+	// Lifecycle
 	onMount(() => {
 		if (chatContainer) {
-			chatContainer.scrollTop = chatContainer.scrollHeight;
+			scrollToBottom();
 			checkIfAtBottom();
 		}
 		// Initialize textarea height
 		resizeTextarea();
 	});
 
-	// Format time for messages
-	function formatTime(date) {
-		return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+	// Auto scroll to bottom when new messages arrive, but only if already at bottom
+	$: if (messages && chatContainer && isAtBottom) {
+		setTimeout(scrollToBottom, 0);
+	}
+
+	// Watch for changes to newMessage to resize textarea
+	$: if (newMessage !== undefined) {
+		setTimeout(resizeTextarea, 0);
 	}
 </script>
 

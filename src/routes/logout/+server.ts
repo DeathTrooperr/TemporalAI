@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
-import { clearAuthCookie } from '$lib/server/auth.js';
+import { clearAuthCookie } from '$lib/server/utlis/auth.js';
 
 export function GET({ cookies }) {
 	clearAuthCookie(cookies);

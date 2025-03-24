@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
-import { setAuthCookie } from '$lib/server/auth.js';
+import { setAuthCookie } from '$lib/server/utlis/auth.js';
 import { env } from '$env/dynamic/private';
-import type { UserSession } from '$lib/interfaces/userSession.js';
+import type { UserSession } from '$lib/core/interfaces/userSession.js';
 
 const GOOGLE_CLIENT_ID = env.GOOGLE_CLIENT_ID as string;
 const GOOGLE_CLIENT_SECRET = env.GOOGLE_CLIENT_SECRET as string;

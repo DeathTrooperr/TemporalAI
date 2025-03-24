@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { calendarStore } from '../../stores/calendarStore.js';
-	import { getHeaderText } from '../../utils/dateUtils.js';
+	import { calendarStore } from '../../../stores/calendarStore.js';
+	import { getHeaderText } from '../../../utils/dateUtils.js';
 
 	$: currentView = $calendarStore.currentView;
 	$: currentDate = $calendarStore.currentDate;

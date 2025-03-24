@@ -6,7 +6,7 @@ import { OAuth2Client } from 'google-auth-library';
 import OpenAI from 'openai';
 import { DateTime } from 'luxon';
 import { env } from '$env/dynamic/private';
-import { getUserFromCookies } from '$lib/server/auth.js';
+import { getUserFromCookies } from '$lib/server/utlis/auth.js';
 
 // Define types for better type safety
 type DateRange = { start: string; end: string };
@@ -599,7 +599,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		}
 
 		// Get user from cookies
-		const user = await getUserFromCookies(cookies);
+		const user = getUserFromCookies(cookies);
 
 		if (!user?.token) {
 			return json({ error: 'Google Calendar authentication required' }, { status: 401 });

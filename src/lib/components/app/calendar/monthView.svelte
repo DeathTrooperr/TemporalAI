@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { calendarStore } from '../../stores/calendarStore.js';
+	import { calendarStore } from '../../../stores/calendarStore.js';
 	import {
 		getDaysInMonth,
 		getFirstDayOfMonth,
@@ -7,9 +7,9 @@
 		getEventsForDate,
 		isToday,
 		isSelected
-	} from '../../utils/dateUtils.js';
-	import { getEventColor } from '../../utils/styleUtils.js';
-	import type { CalendarEvent } from '../../types/calendar.js';
+	} from '../../../utils/dateUtils.js';
+	import { getEventColor } from '../../../utils/styleUtils.js';
+	import type { CalendarEvent } from '$lib/core/types/calendar.js';
 
 	export let events: CalendarEvent[] = [];
 

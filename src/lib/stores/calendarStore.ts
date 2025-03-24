@@ -1,5 +1,5 @@
 import { writable, derived, get } from 'svelte/store';
-import type { CalendarViewType } from '../types/calendar.js';
+import type { CalendarViewType } from '$lib/core/types/calendar.js';
 
 // Calendar state
 const createCalendarStore = () => {

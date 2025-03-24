@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { calendarStore } from '../../stores/calendarStore.js';
-	import { getEventsForDate, formatTime } from '../../utils/dateUtils.js';
-	import { createStyleString } from '../../utils/styleUtils.js';
-	import type { CalendarEvent } from '../../types/calendar.js';
+	import { calendarStore } from '../../../stores/calendarStore.js';
+	import { getEventsForDate, formatTime } from '../../../utils/dateUtils.js';
+	import { createStyleString } from '../../../utils/styleUtils.js';
+	import type { CalendarEvent } from '$lib/core/types/calendar.js';
 
 	export let events: CalendarEvent[] = [];
 
