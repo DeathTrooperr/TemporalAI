@@ -1,58 +1,59 @@
-# create-svelte
+# TemporalAI
+## Overview
+TemporalAI is an AI-powered calendar management assistant built with Svelte 5 and SvelteKit. The application provides an intelligent interface to help users manage their calendar events, appointments, and schedules through natural language interactions.
+## Features
+- **AI-Powered Calendar Management**: Interact with your calendar through natural conversations
+- **Modern UI**: Built with Svelte 5 and styled with Tailwind CSS
+- **Responsive Design**: Works seamlessly across desktop and mobile devices
+- **Secure Authentication**: JWT-based authentication for user accounts
 
-Everything you need to build a Svelte library, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/main/packages/create-svelte).
+## Technology Stack
+- **Frontend**: Svelte 5, SvelteKit 2.0
+- **Styling**: Tailwind CSS 4.0 with Typography and Forms plugins
+- **Date/Time Handling**: Luxon 3.5
+- **AI Integration**: OpenAI API 4.89
+- **Google Calendar Integration**: Google APIs (googleapis 148.0)
+- **Authentication**: JWT (jsonwebtoken 9.0.2)
+- **Build System**: Vite 6.0
+- **Code Quality**: ESLint, Prettier, TypeScript
 
-Read more about creating a library [in the docs](https://svelte.dev/docs/kit/packaging).
-
-## Creating a project
-
-If you're seeing this, you've probably already done this step. Congrats!
-
-```bash
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
+## Development
+To get started with development:
+1. Clone the repository
+2. Install dependencies:
+``` bash
+   npm install
 ```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```bash
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+1. Start the development server:
+``` bash
+   npm run dev
 ```
-
-Everything inside `src/lib` is part of your library, everything inside `src/routes` can be used as a showcase or preview app.
-
-## Building
-
-To build your library:
-
-```bash
-npm run package
+Or open in a browser tab automatically:
+``` bash
+   npm run dev -- --open
 ```
-
-To create a production version of your showcase app:
-
-```bash
+## Building for Production
+To build the application for production:
+``` bash
 npm run build
 ```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
-
-## Publishing
-
-Go into the `package.json` and give your package the desired name through the `"name"` option. Also consider adding a `"license"` field and point it to a `LICENSE` file which you can create from a template (one popular option is the [MIT license](https://opensource.org/license/mit/)).
-
-To publish your library to [npm](https://www.npmjs.com):
-
-```bash
-npm publish
+You can preview the production build with:
+``` bash
+npm run preview
 ```
+## Cloudflare Deployment
+This project was originally intended to be deployed with Cloudflare Pages using the `@sveltejs/adapter-cloudflare` adapter. While the foundation for Cloudflare deployment has been set up, these features weren't fully completed due to time constraints. Future development will focus on:
+- Completing Cloudflare Functions integration
+- Setting up Cloudflare KV for data storage
+- Implementing proper environment variable management for Cloudflare
+- Configuring Cloudflare deployment pipelines
+
+## Project Structure
+- `src/lib` - Core library components and functionality
+- `src/routes` - SvelteKit routes and pages
+- `static` - Static assets
+
+## Contributing
+Contributions are welcome! Please feel free to submit a Pull Request.
+## License
+This project is licensed under the MIT License - see the LICENSE file for details.
