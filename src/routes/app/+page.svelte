@@ -11,8 +11,6 @@
 		picture: string;
 	};
 
-	// Removed unused BannerType
-
 	const { user } = data as { user: User };
 
 	// State for the mobile tab toggle

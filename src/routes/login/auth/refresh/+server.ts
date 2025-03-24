@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { getUserFromCookies, resignToken } from '$lib/server/auth.js';
+import { getUserFromCookies, refreshUserSession } from '$lib/server/auth.js';
 
 export async function GET({ cookies }) {
 	const user = getUserFromCookies(cookies);
@@ -9,7 +9,7 @@ export async function GET({ cookies }) {
 	}
 
 	// Issue a new token with updated expiry time
-	resignToken(cookies);
+	refreshUserSession(cookies);
 
 	return json({ success: true, message: 'Token refreshed successfully' });
 }

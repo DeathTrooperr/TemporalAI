@@ -4,4 +4,5 @@ export interface UserSession {
 	name: string;
 	picture: string;
 	token: string;
+	refreshToken: string;
 }

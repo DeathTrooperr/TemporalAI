@@ -8,6 +8,28 @@ import { DateTime } from 'luxon';
 import { env } from '$env/dynamic/private';
 import { getUserFromCookies } from '$lib/server/auth.js';
 
+// Define types for better type safety
+type DateRange = { start: string; end: string };
+type LLMResponse = {
+	type: 'json' | 'chat' | 'error';
+	data: Record<string, any>;
+};
+type CalendarEventData = {
+	event_title?: string;
+	date?: string;
+	event_time?: string;
+	new_time?: string;
+	original_time?: string;
+	duration?: string;
+	location?: string;
+	notes?: string;
+	attendees?: string[];
+	event_id?: string;
+	date_range?: string;
+	query_type?: 'free_slots' | 'busy_times' | 'event_details';
+};
+
+// Initialize OpenAI once
 const openai = new OpenAI({
 	baseURL: 'https://api.studio.nebius.com/v1/',
 	apiKey: env.NEBIUS_API_KEY
@@ -16,7 +38,7 @@ const openai = new OpenAI({
 /**
  * Get Google Calendar service using the user's stored token
  */
-async function getCalendarService(token: string) {
+const getCalendarService = async (token: string) => {
 	try {
 		const oAuth2Client = new OAuth2Client();
 		oAuth2Client.setCredentials({ access_token: token });
@@ -25,15 +47,15 @@ async function getCalendarService(token: string) {
 		console.error('Failed to get calendar service:', error);
 		throw new Error('Authentication error with Google Calendar');
 	}
-}
+};
 
 /**
  * Parse date range expressions like "next week", "this month", etc.
  */
-function parseDateRange(rangeExpression: string): { start: string, end: string } {
+const parseDateRange = (rangeExpression: string): DateRange => {
 	const now = DateTime.now();
-	let start: DateTime = now;
-	let end: DateTime = now;
+	let start = now;
+	let end = now;
 
 	// Normalize the expression
 	const expression = rangeExpression.toLowerCase().trim();
@@ -69,37 +91,29 @@ function parseDateRange(rangeExpression: string): { start: string, end: string }
 				const amount = parseInt(match[1], 10);
 				const unit = match[2].toLowerCase().startsWith('day') ? 'days' :
 					match[2].toLowerCase().startsWith('week') ? 'weeks' : 'months';
-
 				end = now.plus({ [unit]: amount });
-			} else {
-				// Default to today if we can't parse
-				end = now.endOf('day');
 			}
 	}
 
 	return {
-		start: start.toISO(),
-		end: end.toISO()
+		start: start.toISO() || '',
+		end: end.toISO() || ''
 	};
-}
+};
 
 /**
  * Get structured calendar instruction from Nebius LLM
- * Handles both JSON format and plain text responses
  */
-async function getNebiusLlmResponse(userInput: string) {
+const getNebiusLlmResponse = async (userInput: string): Promise<LLMResponse> => {
 	try {
 		// Get current date and time
 		const now = DateTime.now();
 		const currentDate = now.toFormat('yyyy-MM-dd');
 		const currentTime = now.toFormat('h:mm a');
 
-		console.log(`Current date: ${currentDate}, Current time: ${currentTime}`);
-
 		// Create system message with date and time
-		let systemMessage = `Today's date is ${currentDate} and the time is ${currentTime}.\n`;
+		const systemMessage = `Today's date is ${currentDate} and the time is ${currentTime}.
 
-		systemMessage += `
 You are a calendar assistant that helps users manage their calendar events.
 
 For calendar management actions, extract key information and respond with JSON:
@@ -126,8 +140,7 @@ For general questions or conversations about calendar usage, respond with:
   "response": "Your natural language response here"
 }
 
-Always include the action field. Calendar operations must always have all required fields for that operation.
-`;
+Always include the action field. Calendar operations must always have all required fields for that operation.`;
 
 		// Send user input and system message to Nebius LLM
 		const response = await openai.chat.completions.create({
@@ -147,101 +160,97 @@ Always include the action field. Calendar operations must always have all requir
 			throw new Error('Empty response from LLM');
 		}
 
-		console.log(`Nebius LLM raw response: ${responseContent}`);
-
-		// Comprehensive JSON extraction
-		let jsonData = null;
-
-		// Try several approaches to extract the JSON
+		// Try to extract JSON from the response
 		try {
-			// First attempt: direct JSON parsing
-			jsonData = JSON.parse(responseContent.trim());
+			// Direct JSON parsing
+			return { type: 'json', data: JSON.parse(responseContent.trim()) };
 		} catch (error) {
-			// Second attempt: Extract JSON from markdown code blocks
+			// Extract JSON from markdown code blocks
 			const jsonMatch = responseContent.match(/```(?:json)?\n([\s\S]*?)\n```/);
 			if (jsonMatch) {
 				try {
-					jsonData = JSON.parse(jsonMatch[1].trim());
+					return { type: 'json', data: JSON.parse(jsonMatch[1].trim()) };
 				} catch (e) {
-					console.error(`Failed to parse JSON from code block: ${e}`);
-				}
-			} else {
-				// Third attempt: Find anything that looks like JSON between curly braces
-				const jsonBraceMatch = responseContent.match(/\{[\s\S]*\}/);
-				if (jsonBraceMatch) {
-					try {
-						jsonData = JSON.parse(jsonBraceMatch[0]);
-					} catch (e) {
-						console.error(`Failed to parse JSON from braces: ${e}`);
+					// Try to find JSON between curly braces
+					const bracesMatch = responseContent.match(/\{[\s\S]*\}/);
+					if (bracesMatch) {
+						try {
+							return { type: 'json', data: JSON.parse(bracesMatch[0]) };
+						} catch (e) {
+							// Fallback to chat response
+							return {
+								type: 'chat',
+								data: { action: 'chat', response: responseContent.trim() }
+							};
+						}
 					}
 				}
 			}
-		}
 
-		// If we successfully parsed JSON
-		if (jsonData) {
+			// If all JSON parsing attempts fail
 			return {
-				type: 'json',
-				data: jsonData
+				type: 'chat',
+				data: { action: 'chat', response: responseContent.trim() }
 			};
 		}
-
-		// Fallback: return as chat response
-		return {
-			type: 'chat',
-			data: {
-				action: 'chat',
-				response: responseContent.trim()
-			}
-		};
-	} catch (error) {
-		console.error(`LLM processing error: ${error}`);
+	} catch (error: any) {
 		return {
 			type: 'error',
-			data: {
-				message: `Error processing your request: ${error.message}`
-			}
+			data: { message: `Error processing your request: ${error.message}` }
 		};
 	}
-}
+};
 
 /**
  * Handle calendar event creation
  */
-async function createCalendarEvent(calendarService, eventData) {
+const createCalendarEvent = async (
+	calendarService: calendar_v3.Calendar,
+	eventData: CalendarEventData
+) => {
 	try {
-		const startDateTime = DateTime.fromFormat(`${eventData.date} ${eventData.event_time}`, 'yyyy-MM-dd h:mm a');
+		if (!eventData.date || !eventData.event_time || !eventData.event_title) {
+			return { success: false, error: 'Missing required event information' };
+		}
+
+		const startDateTime = DateTime.fromFormat(
+			`${eventData.date} ${eventData.event_time}`,
+			'yyyy-MM-dd h:mm a'
+		);
 
 		// Parse duration
 		let durationInMinutes = 60; // Default 1 hour
-		const durationMatch = eventData.duration?.match(/(\d+)\s+(hour|minute|min|hr)/i);
-		if (durationMatch) {
-			const amount = parseInt(durationMatch[1], 10);
-			const unit = durationMatch[2].toLowerCase();
-			durationInMinutes = unit.startsWith('hour') || unit.startsWith('hr') ? amount * 60 : amount;
+		if (eventData.duration) {
+			const durationMatch = eventData.duration.match(/(\d+)\s+(hour|minute|min|hr)/i);
+			if (durationMatch) {
+				const amount = parseInt(durationMatch[1], 10);
+				const unit = durationMatch[2].toLowerCase();
+				durationInMinutes = unit.startsWith('hour') || unit.startsWith('hr') ? amount * 60 : amount;
+			}
 		}
 
 		const endDateTime = startDateTime.plus({ minutes: durationInMinutes });
+		const timeZone = startDateTime.zoneName || 'UTC';
 
 		const event = {
 			summary: eventData.event_title,
 			location: eventData.location || '',
 			description: eventData.notes || '',
 			start: {
-				dateTime: startDateTime.toISO(),
-				timeZone: startDateTime.zoneName,
+				dateTime: startDateTime.toISO() || '',
+				timeZone
 			},
 			end: {
-				dateTime: endDateTime.toISO(),
-				timeZone: endDateTime.zoneName,
+				dateTime: endDateTime.toISO() || '',
+				timeZone
 			},
-			attendees: eventData.attendees?.map(email => ({ email })) || [],
+			attendees: eventData.attendees?.map(email => ({ email })) || []
 		};
 
 		const result = await calendarService.events.insert({
 			calendarId: 'primary',
 			requestBody: event,
-			sendUpdates: eventData.attendees?.length ? 'all' : 'none',
+			sendUpdates: eventData.attendees?.length ? 'all' : 'none'
 		});
 
 		return {
@@ -249,34 +258,40 @@ async function createCalendarEvent(calendarService, eventData) {
 			eventId: result.data.id,
 			eventLink: result.data.htmlLink,
 			summary: result.data.summary,
-			start: result.data.start,
+			start: result.data.start
 		};
-	} catch (error) {
-		console.error('Error creating calendar event:', error);
-		return {
-			success: false,
-			error: error.message,
-		};
+	} catch (error: any) {
+		return { success: false, error: error.message };
 	}
-}
+};
 
 /**
  * Handle calendar event rescheduling
  */
-async function rescheduleCalendarEvent(calendarService, eventData) {
+const rescheduleCalendarEvent = async (
+	calendarService: calendar_v3.Calendar,
+	eventData: CalendarEventData
+) => {
 	try {
-		// If we have an event ID, use it directly
+		// Find event ID either directly or by searching
 		let eventId = eventData.event_id;
 
-		// Otherwise, search for the event by title and original time
 		if (!eventId && eventData.event_title && eventData.date && eventData.original_time) {
 			const originalDateTime = DateTime.fromFormat(
 				`${eventData.date} ${eventData.original_time}`,
 				'yyyy-MM-dd h:mm a'
 			);
 
+			if (!originalDateTime.isValid) {
+				return { success: false, error: 'Invalid original date/time format' };
+			}
+
 			const timeMin = originalDateTime.minus({ hours: 1 }).toISO();
 			const timeMax = originalDateTime.plus({ hours: 1 }).toISO();
+
+			if (!timeMin || !timeMax) {
+				return { success: false, error: 'Error calculating time range' };
+			}
 
 			// Search for events that match the title around the specified time
 			const searchResult = await calendarService.events.list({
@@ -285,30 +300,28 @@ async function rescheduleCalendarEvent(calendarService, eventData) {
 				timeMax,
 				q: eventData.event_title,
 				singleEvents: true,
-				orderBy: 'startTime',
+				orderBy: 'startTime'
 			});
 
-			if (searchResult.data.items && searchResult.data.items.length > 0) {
-				eventId = searchResult.data.items[0].id;
+			if (searchResult.data.items?.length) {
+				eventId = searchResult.data.items[0].id ?? undefined;
 			} else {
-				return {
-					success: false,
-					error: 'Could not find the event to reschedule',
-				};
+				return { success: false, error: 'Could not find the event to reschedule' };
 			}
 		}
 
 		if (!eventId) {
-			return {
-				success: false,
-				error: 'Insufficient information to identify the event to reschedule',
-			};
+			return { success: false, error: 'Insufficient information to identify the event' };
+		}
+
+		if (!eventData.new_time || !eventData.date) {
+			return { success: false, error: 'New time is required for rescheduling' };
 		}
 
 		// Get the current event
 		const event = await calendarService.events.get({
 			calendarId: 'primary',
-			eventId,
+			eventId
 		});
 
 		// Calculate new start time
@@ -317,32 +330,44 @@ async function rescheduleCalendarEvent(calendarService, eventData) {
 			'yyyy-MM-dd h:mm a'
 		);
 
+		if (!newStartDateTime.isValid) {
+			return { success: false, error: 'Invalid new date/time format' };
+		}
+
 		// Calculate duration of original event
-		const originalStart = DateTime.fromISO(event.data.start.dateTime);
-		const originalEnd = DateTime.fromISO(event.data.end.dateTime);
+		const originalStart = event.data.start?.dateTime ?
+			DateTime.fromISO(event.data.start.dateTime) : undefined;
+		const originalEnd = event.data.end?.dateTime ?
+			DateTime.fromISO(event.data.end.dateTime) : undefined;
+
+		if (!originalStart || !originalEnd || !originalStart.isValid || !originalEnd.isValid) {
+			return { success: false, error: 'Invalid original event times' };
+		}
+
 		const durationMillis = originalEnd.diff(originalStart).milliseconds;
 
 		// Calculate new end time based on the same duration
 		const newEndDateTime = newStartDateTime.plus({ milliseconds: durationMillis });
+		const timeZone = newStartDateTime.zoneName || 'UTC';
 
 		// Update the event
 		const updatedEvent = {
 			...event.data,
 			start: {
-				dateTime: newStartDateTime.toISO(),
-				timeZone: newStartDateTime.zoneName,
+				dateTime: newStartDateTime.toISO() || '',
+				timeZone
 			},
 			end: {
-				dateTime: newEndDateTime.toISO(),
-				timeZone: newEndDateTime.zoneName,
-			},
+				dateTime: newEndDateTime.toISO() || '',
+				timeZone
+			}
 		};
 
 		const result = await calendarService.events.update({
 			calendarId: 'primary',
 			eventId,
 			requestBody: updatedEvent,
-			sendUpdates: 'all',
+			sendUpdates: 'all'
 		});
 
 		return {
@@ -350,34 +375,40 @@ async function rescheduleCalendarEvent(calendarService, eventData) {
 			eventId: result.data.id,
 			eventLink: result.data.htmlLink,
 			summary: result.data.summary,
-			newStart: result.data.start,
+			newStart: result.data.start
 		};
-	} catch (error) {
-		console.error('Error rescheduling calendar event:', error);
-		return {
-			success: false,
-			error: error.message,
-		};
+	} catch (error: any) {
+		return { success: false, error: error.message };
 	}
-}
+};
 
 /**
  * Handle calendar event cancellation
  */
-async function cancelCalendarEvent(calendarService, eventData) {
+const cancelCalendarEvent = async (
+	calendarService: calendar_v3.Calendar,
+	eventData: CalendarEventData
+) => {
 	try {
-		// If we have an event ID, use it directly
+		// Find event ID either directly or by searching
 		let eventId = eventData.event_id;
 
-		// Otherwise, search for the event by title and time
 		if (!eventId && eventData.event_title && eventData.date && eventData.event_time) {
 			const eventDateTime = DateTime.fromFormat(
 				`${eventData.date} ${eventData.event_time}`,
 				'yyyy-MM-dd h:mm a'
 			);
 
+			if (!eventDateTime.isValid) {
+				return { success: false, error: 'Invalid date/time format' };
+			}
+
 			const timeMin = eventDateTime.minus({ hours: 1 }).toISO();
 			const timeMax = eventDateTime.plus({ hours: 1 }).toISO();
+
+			if (!timeMin || !timeMax) {
+				return { success: false, error: 'Error calculating time range' };
+			}
 
 			// Search for events that match the title around the specified time
 			const searchResult = await calendarService.events.list({
@@ -386,53 +417,47 @@ async function cancelCalendarEvent(calendarService, eventData) {
 				timeMax,
 				q: eventData.event_title,
 				singleEvents: true,
-				orderBy: 'startTime',
+				orderBy: 'startTime'
 			});
 
-			if (searchResult.data.items && searchResult.data.items.length > 0) {
+			if (searchResult.data.items?.length && searchResult.data.items[0].id) {
 				eventId = searchResult.data.items[0].id;
 			} else {
-				return {
-					success: false,
-					error: 'Could not find the event to cancel',
-				};
+				return { success: false, error: 'Could not find the event to cancel' };
 			}
 		}
 
 		if (!eventId) {
-			return {
-				success: false,
-				error: 'Insufficient information to identify the event to cancel',
-			};
+			return { success: false, error: 'Insufficient information to identify the event' };
 		}
 
 		// Delete the event
 		await calendarService.events.delete({
 			calendarId: 'primary',
 			eventId,
-			sendUpdates: 'all',
+			sendUpdates: 'all'
 		});
 
-		return {
-			success: true,
-			message: 'Event successfully cancelled',
-		};
-	} catch (error) {
-		console.error('Error cancelling calendar event:', error);
-		return {
-			success: false,
-			error: error.message,
-		};
+		return { success: true, message: 'Event successfully cancelled' };
+	} catch (error: any) {
+		return { success: false, error: error.message };
 	}
-}
+};
 
 /**
  * Query calendar for events or availability
  */
-async function queryCalendar(calendarService, queryData) {
+const queryCalendar = async (
+	calendarService: calendar_v3.Calendar,
+	queryData: CalendarEventData
+) => {
 	try {
 		// Parse date range from natural language
 		const dateRange = parseDateRange(queryData.date_range || 'today');
+
+		if (!queryData.query_type) {
+			return { success: false, error: 'Query type is required' };
+		}
 
 		switch (queryData.query_type) {
 			case 'free_slots': {
@@ -441,88 +466,89 @@ async function queryCalendar(calendarService, queryData) {
 					requestBody: {
 						timeMin: dateRange.start,
 						timeMax: dateRange.end,
-						items: [{ id: 'primary' }],
-					},
+						items: [{ id: 'primary' }]
+					}
 				});
 
-				const busySlots = freeBusyRequest.data.calendars.primary.busy || [];
-
-				// Convert busy slots to free slots
+				const busySlots = freeBusyRequest.data.calendars?.primary?.busy || [];
 				let startTime = DateTime.fromISO(dateRange.start);
 				const endTime = DateTime.fromISO(dateRange.end);
-				const freeSlots = [];
 
-				// Start with 9am if the start time is before that
-				if (startTime.hour < 9) {
-					startTime = startTime.set({ hour: 9, minute: 0 });
+				if (!startTime.isValid || !endTime.isValid) {
+					return { success: false, error: 'Invalid date range' };
 				}
 
-				// Process each busy slot to find free time
-				busySlots.forEach(busySlot => {
-					const busyStart = DateTime.fromISO(busySlot.start);
-					const busyEnd = DateTime.fromISO(busySlot.end);
+				// Start with 9am if the start time is before that
+				startTime = startTime.hour < 9 ? startTime.set({ hour: 9, minute: 0 }) : startTime;
 
-					// If there's free time before this busy slot
+				// End at 6pm if the end time is after that
+				const dayEndTime = endTime.hour > 18 ? endTime.set({ hour: 18, minute: 0 }) : endTime;
+
+				// Process busy slots to find free time
+				const freeSlots = [];
+				for (const busySlot of busySlots) {
+					const busyStart = DateTime.fromISO(busySlot.start || '');
+					const busyEnd = DateTime.fromISO(busySlot.end || '');
+
 					if (startTime < busyStart) {
+						const duration = busyStart.diff(startTime).as('minutes');
+						if (duration >= 30) {
+							freeSlots.push({
+								start: startTime.toISO(),
+								end: busyStart.toISO(),
+								duration
+							});
+						}
+					}
+					startTime = busyEnd;
+				}
+
+				// Add any remaining free time after the last busy slot
+				if (startTime < dayEndTime) {
+					const duration = dayEndTime.diff(startTime).as('minutes');
+					if (duration >= 30) {
 						freeSlots.push({
 							start: startTime.toISO(),
-							end: busyStart.toISO(),
-							duration: busyStart.diff(startTime).as('minutes'),
+							end: dayEndTime.toISO(),
+							duration
 						});
 					}
-
-					// Move the startTime pointer to after this busy slot
-					startTime = busyEnd;
-				});
-
-				// Add any free time after the last busy slot until end of day (6pm)
-				const dayEndTime = endTime.hour > 18 ? endTime.set({ hour: 18, minute: 0 }) : endTime;
-				if (startTime < dayEndTime) {
-					freeSlots.push({
-						start: startTime.toISO(),
-						end: dayEndTime.toISO(),
-						duration: dayEndTime.diff(startTime).as('minutes'),
-					});
 				}
 
 				return {
 					success: true,
-					freeSlots: freeSlots.filter(slot => slot.duration >= 30),  // Filter for slots at least 30 min
-					dateRange,
+					freeSlots,
+					dateRange
 				};
 			}
 
 			case 'busy_times': {
-				// Get list of events
 				const eventsResult = await calendarService.events.list({
 					calendarId: 'primary',
 					timeMin: dateRange.start,
 					timeMax: dateRange.end,
 					singleEvents: true,
-					orderBy: 'startTime',
+					orderBy: 'startTime'
 				});
 
 				const events = eventsResult.data.items || [];
 				const busyTimes = events.map(event => ({
 					summary: event.summary,
-					start: event.start.dateTime || event.start.date,
-					end: event.end.dateTime || event.end.date,
-					id: event.id,
+					start: event.start?.dateTime || event.start?.date,
+					end: event.end?.dateTime || event.end?.date,
+					id: event.id
 				}));
 
 				return {
 					success: true,
 					busyTimes,
-					dateRange,
+					dateRange
 				};
 			}
 
 			case 'event_details': {
 				if (!queryData.event_title) {
-					return {
-						success: false,
-						error: 'Event title is required for detailed event information',
-					};
+					return { success: false, error: 'Event title is required for event details' };
 				}
 
 				// Search for the specific event
@@ -532,16 +558,12 @@ async function queryCalendar(calendarService, queryData) {
 					timeMax: dateRange.end,
 					q: queryData.event_title,
 					singleEvents: true,
-					orderBy: 'startTime',
+					orderBy: 'startTime'
 				});
 
 				const events = eventsResult.data.items || [];
-
-				if (events.length === 0) {
-					return {
-						success: false,
-						error: 'No matching events found',
-					};
+				if (!events.length) {
+					return { success: false, error: 'No matching events found' };
 				}
 
 				return {
@@ -555,25 +577,18 @@ async function queryCalendar(calendarService, queryData) {
 						end: event.end,
 						attendees: event.attendees,
 						organizer: event.organizer,
-						htmlLink: event.htmlLink,
-					})),
+						htmlLink: event.htmlLink
+					}))
 				};
 			}
 
 			default:
-				return {
-					success: false,
-					error: 'Unknown query type',
-				};
+				return { success: false, error: 'Unknown query type' };
 		}
-	} catch (error) {
-		console.error('Error querying calendar:', error);
-		return {
-			success: false,
-			error: error.message,
-		};
+	} catch (error: any) {
+		return { success: false, error: error.message };
 	}
-}
+};
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
 	try {
@@ -586,12 +601,12 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		// Get user from cookies
 		const user = await getUserFromCookies(cookies);
 
-		if (!user?.googleToken) {
+		if (!user?.token) {
 			return json({ error: 'Google Calendar authentication required' }, { status: 401 });
 		}
 
 		// Get calendar service
-		const calendarService = await getCalendarService(user.googleToken);
+		const calendarService = await getCalendarService(user.token);
 
 		// Get structured data from LLM
 		const llmResponse = await getNebiusLlmResponse(message);
@@ -603,43 +618,20 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		if (llmResponse.type === 'chat') {
 			return json({
 				type: 'chat',
-				message: llmResponse.data.response || 'I understand, but I need more details to help with your calendar.'
+				message: llmResponse.data.response || 'I need more details to help with your calendar.'
 			});
 		}
 
 		// Handle structured calendar operations
 		const { action, ...actionData } = llmResponse.data;
-		let result;
 
-		switch (action) {
-			case 'create':
-				result = await createCalendarEvent(calendarService, actionData);
-				break;
-
-			case 'reschedule':
-				result = await rescheduleCalendarEvent(calendarService, actionData);
-				break;
-
-			case 'cancel':
-				result = await cancelCalendarEvent(calendarService, actionData);
-				break;
-
-			case 'query':
-				result = await queryCalendar(calendarService, actionData);
-				break;
-
-			case 'chat':
-				return json({
-					type: 'chat',
-					message: actionData.response || 'I understand. What would you like to do with your calendar?'
-				});
-
-			default:
-				result = {
-					success: false,
-					error: 'Unknown calendar action requested'
-				};
-		}
+		// Execute the appropriate calendar operation based on action
+		const result = action === 'create' ? await createCalendarEvent(calendarService, actionData) :
+			action === 'reschedule' ? await rescheduleCalendarEvent(calendarService, actionData) :
+				action === 'cancel' ? await cancelCalendarEvent(calendarService, actionData) :
+					action === 'query' ? await queryCalendar(calendarService, actionData) :
+						action === 'chat' ? { type: 'chat', message: actionData.response || 'What would you like to do with your calendar?' } :
+							{ success: false, error: 'Unknown calendar action requested' };
 
 		return json({
 			type: action,
@@ -647,7 +639,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			original_data: actionData
 		});
 
-	} catch (error) {
+	} catch (error: any) {
 		console.error('Error handling calendar request:', error);
 		return json({ error: `Error processing calendar request: ${error.message}` }, { status: 500 });
 	}

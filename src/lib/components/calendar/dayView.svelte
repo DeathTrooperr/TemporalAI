@@ -48,41 +48,33 @@
 			eventHeights.set(event.id, Math.max(naturalHeight, DEFAULT_EVENT_MIN_HEIGHT));
 		}
 
+		// Track overlapping groups to manage shift levels
+		let currentGroup: CalendarEvent[] = [];
+		let maxShiftInCurrentGroup = 0;
+
 		// Analyze each event's overlap with prior events
 		for (let i = 0; i < sortedEvents.length; i++) {
 			const currentEvent = sortedEvents[i];
-			const currentEventHeight = eventHeights.get(currentEvent.id) || DEFAULT_EVENT_MIN_HEIGHT;
 
-			// Check earlier events for significant overlapping
-			for (let j = 0; j < i; j++) {
-				const earlierEvent = sortedEvents[j];
-				const earlierEventHeight = eventHeights.get(earlierEvent.id) || DEFAULT_EVENT_MIN_HEIGHT;
-
-				// Check if events overlap
-				const overlapStart = Math.max(currentEvent.start.getTime(), earlierEvent.start.getTime());
-				const overlapEnd = Math.min(currentEvent.end.getTime(), earlierEvent.end.getTime());
-				const overlapDuration = (overlapEnd - overlapStart) / (60 * 1000); // in minutes
-
-				// Calculate the overlapping height in pixels
-				const overlapHeightInPixels = (overlapDuration / 60) * HOUR_HEIGHT;
-
-				// Only shift if both:
-				// 1. Overlap is significant enough (time-wise)
-				// 2. The overlap would hide important content (height-wise)
-				if (
-					overlapDuration >= MIN_OVERLAP_FOR_SHIFT &&
-					overlapHeightInPixels > MIN_CONTENT_HEIGHT
-				) {
-					// If the earlier event is already shifted, shift the current event more
-					const earlierEventShift = eventShifts.get(earlierEvent.id) || 0;
-					const currentEventShift = eventShifts.get(currentEvent.id) || 0;
-
-					// Ensure we shift more than the overlapping event
-					if (earlierEventShift >= currentEventShift) {
-						eventShifts.set(currentEvent.id, earlierEventShift + 1);
-					}
+			// Remove events from current group that don't overlap with current event
+			currentGroup = currentGroup.filter(groupEvent => {
+				const overlaps = groupEvent.end.getTime() > currentEvent.start.getTime();
+				if (!overlaps) {
+					maxShiftInCurrentGroup = Math.max(...[...eventShifts.values()]);
 				}
+				return overlaps;
+			});
+
+			// If current event overlaps with any event in current group, increment shift
+			if (currentGroup.length > 0) {
+				eventShifts.set(String(currentEvent.id), currentGroup.length);
+			} else {
+				// Start new group with no shift
+				eventShifts.set(String(currentEvent.id), 0);
+				maxShiftInCurrentGroup = 0;
 			}
+
+			currentGroup.push(currentEvent);
 		}
 
 		// Return processed events with position information

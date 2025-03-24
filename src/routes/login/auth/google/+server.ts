@@ -59,7 +59,8 @@ export async function GET({ url, cookies }) {
 			email: userData.email,
 			name: userData.name,
 			picture: userData.picture,
-			token: tokens.access_token
+			token: tokens.access_token,
+			refreshToken: tokens.refresh_token
 		};
 
 		// Step 5: Set auth cookie
