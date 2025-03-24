@@ -72,5 +72,8 @@
 		"luxon": "^3.5.0",
 		"openai": "^4.89.0",
 		"svelte-transition": "^0.0.17"
+	},
+	"engines": {
+		"node": ">=18.18.0"
 	}
 }
