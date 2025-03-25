@@ -1,5 +1,5 @@
 import { redirect, type Handle } from '@sveltejs/kit';
-import { getUserFromCookies } from '$lib/server/utlis/auth.js';
+import { clearAuthCookie, getUserFromCookies, setAuthCookie } from '$lib/server/utlis/auth.js';
 
 // List of protected routes that require authentication
 const PROTECTED_ROUTES = ['/app', '/api'];
@@ -8,20 +8,23 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const url = new URL(event.request.url);
 	const path = url.pathname;
 
+	// Get user from cookies
+	const user = getUserFromCookies(event.cookies);
+
+	// Special handling for login and logout
+	if (path === '/login' && user) {
+		return redirect(302, '/app');
+	} else if (path === '/logout') {
+		clearAuthCookie(event.cookies);
+		return redirect(302, '/');
+	}
+
 	// Check if the path is a static asset
 	const isStaticAsset =
 		path.startsWith('/assets/') ||
 		path.endsWith('.js') ||
 		path.endsWith('.css') ||
 		path.endsWith('.ico');
-
-	// Get user from cookies
-	const user = getUserFromCookies(event.cookies);
-
-	// Redirect from login to app if user is already logged in
-	if (path === '/login' && user) {
-		return redirect(302, '/app');
-	}
 
 	// Check if the route requires protection
 	const isProtectedRoute = PROTECTED_ROUTES.some(
@@ -45,7 +48,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	// Set user in locals if available (for all routes)
 	if (user) {
-		const { token, ...safeUser } = user; // Exclude token
+		const { token, refreshToken, ...safeUser } = user; // Exclude sensitive tokens
 		event.locals.user = safeUser;
 	}
 

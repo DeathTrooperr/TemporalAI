@@ -1,5 +1,21 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { fade, slide } from 'svelte/transition';
+	import { quintOut } from 'svelte/easing';
+	import { calendarStore } from '../../stores/calendarStore.js';
+
+	$: year = $calendarStore.currentYear;
+
+	async function refreshEvents() {
+		try {
+			const response = await fetch(`/api/calendar/?year:${year}`);
+			if (response.ok) {
+				calendarStore.updateEvents(await response.json());
+			}
+		} catch (error) {
+			console.error('Failed to fetch events:', error);
+		}
+	}
 
 	// Define types for our chat messages
 	interface ChatMessage {
@@ -35,7 +51,8 @@
 	// Constants for UI behavior
 	const TEXTAREA_MAX_HEIGHT = 150; // pixels
 	const SCROLL_THRESHOLD = 20; // pixels from bottom to consider "at bottom"
-	const ERROR_MESSAGE = "Sorry, I encountered an error while processing your request. Please try again later.";
+	const ERROR_MESSAGE =
+		'Sorry, I encountered an error while processing your request. Please try again later.';
 	const FALLBACK_MESSAGE = "Sorry, I couldn't process your request.";
 
 	// Auto-resize the textarea based on content
@@ -72,7 +89,9 @@
 	}
 
 	// Message management
-	function addMessage(messageData: Partial<ChatMessage> & { text: string; sender: 'user' | 'ai' }): void {
+	function addMessage(
+		messageData: Partial<ChatMessage> & { text: string; sender: 'user' | 'ai' }
+	): void {
 		const newId = messages.length + 1;
 		messages = [
 			...messages,
@@ -86,7 +105,7 @@
 	}
 
 	function removeLoadingMessages(): void {
-		messages = messages.filter(msg => !msg.isLoading);
+		messages = messages.filter((msg) => !msg.isLoading);
 	}
 
 	// Send message functionality
@@ -102,8 +121,8 @@
 		setTimeout(resizeTextarea, 0);
 
 		try {
-			// Add temporary "thinking" message
-			addMessage({ sender: 'ai', text: "...", isLoading: true });
+			// Add loading message with animated bubble
+			addMessage({ sender: 'ai', text: '', isLoading: true });
 
 			// Make request to our AI endpoint
 			const response = await fetch('/api/ai', {
@@ -119,12 +138,13 @@
 			}
 
 			const data = await response.json();
+			refreshEvents().then(() => console.log('refreshed'));
 
 			// Remove loading message and add the actual response
 			removeLoadingMessages();
 			addMessage({
 				sender: 'ai',
-				text: data.status === "success" ? data.message : FALLBACK_MESSAGE
+				text: data.nlResponse ? data.nlResponse : FALLBACK_MESSAGE
 			});
 		} catch (error) {
 			console.error('Error communicating with AI:', error);
@@ -197,17 +217,37 @@
 			on:scroll={handleScroll}
 		>
 			{#each messages as message (message.id)}
-				<div class="flex {message.sender === 'user' ? 'justify-end' : 'justify-start'}">
+				<div
+					class="flex {message.sender === 'user' ? 'justify-end' : 'justify-start'}"
+					in:fade={{ duration: 200 }}
+				>
 					<div
 						class="max-w-3/4 {message.sender === 'user'
 							? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
 							: 'border border-gray-700 bg-gray-800 text-gray-200'}
-                        rounded-lg p-4 shadow-lg"
+						rounded-lg p-4 shadow-lg"
+						in:slide|local={{ duration: 150, easing: quintOut }}
 					>
-						<div>{message.text}</div>
-						<div class="mt-1 text-right text-xs opacity-75">
-							{formatTime(message.timestamp)}
-						</div>
+						{#if message.isLoading}
+							<div class="flex items-center space-x-1">
+								<div class="loading-bubble h-2 w-2 rounded-full bg-gray-400 opacity-75"></div>
+								<div
+									class="loading-bubble animation-delay-200 h-2 w-2 rounded-full bg-gray-400 opacity-75"
+								></div>
+								<div
+									class="loading-bubble animation-delay-400 h-2 w-2 rounded-full bg-gray-400 opacity-75"
+								></div>
+							</div>
+						{:else}
+							<div>{message.text}</div>
+						{/if}
+
+						<!-- Only show timestamp for AI messages, not for user messages -->
+						{#if message.sender === 'ai' && !message.isLoading}
+							<div class="mt-1 text-right text-xs opacity-75">
+								{formatTime(message.timestamp)}
+							</div>
+						{/if}
 					</div>
 				</div>
 			{/each}
@@ -267,5 +307,34 @@
 <style>
 	.border-gradient-horizontal {
 		border-image: linear-gradient(to left, #3b82f6, #8b5cf6) 1;
+	}
+
+	.loading-bubble {
+		animation: pulse 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+	}
+
+	.animation-delay-200 {
+		animation-delay: 200ms;
+	}
+
+	.animation-delay-400 {
+		animation-delay: 400ms;
+	}
+
+	@keyframes pulse {
+		0%,
+		100% {
+			opacity: 0.4;
+			transform: scale(0.8);
+		}
+		50% {
+			opacity: 1;
+			transform: scale(1);
+		}
+	}
+
+	/* Ensure transitions work properly */
+	:global(.scrollbar-styled > div) {
+		transform-origin: top;
 	}
 </style>

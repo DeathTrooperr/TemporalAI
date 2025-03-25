@@ -1,0 +1,21 @@
+# wrangler.toml
+name = "temporalai"
+compatibility_date = "2025-03-21"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".svelte-kit/cloudflare"
+
+[observability]
+enabled = true
+
+# Environment Variables - Non-sensitive
+[vars]
+REDIRECT_URI = "http://localhost:5173/login/auth/google"
+GOOGLE_CLIENT_ID = "677162306222-ajunrqqqtn902hurs20opuu5lfradcpp.apps.googleusercontent.com"
+
+# Secret Environment Variables
+# These will be managed using 'wrangler secret put' command:
+# - JWT_SECRET
+# - ENCRYPTION_KEY
+# - ENCRYPTION_IV
+# - GOOGLE_CLIENT_SECRET
+# - NEBIUS_API_KEY

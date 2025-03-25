@@ -7,8 +7,8 @@
 		getEventsForDate,
 		isToday,
 		isSelected
-	} from '../../../utils/dateUtils.js';
-	import { getEventColor } from '../../../utils/styleUtils.js';
+	} from '$lib/client/utils/dateUtils.js';
+	import { getEventColor } from '$lib/client/utils/styleUtils.js';
 	import type { CalendarEvent } from '$lib/core/types/calendar.js';
 
 	export let events: CalendarEvent[] = [];
@@ -68,7 +68,7 @@
 							class="event bg-opacity-20 truncate rounded p-1 text-xs"
 							style={`background-color: ${getEventColor(event.color)}; opacity: 0.8;`}
 						>
-							<span class="font-medium text-white">{event.title}</span>
+							<span class="font-medium text-white">{event.summary}</span>
 						</div>
 					{/each}
 				</div>

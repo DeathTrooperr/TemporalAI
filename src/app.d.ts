@@ -4,7 +4,6 @@ import type { UserSession } from '$lib/server/utlis/auth.js';
 
 declare global {
 	namespace App {
-		// interface Error {}
 		interface Locals {
 			user?: UserSession;
 		}

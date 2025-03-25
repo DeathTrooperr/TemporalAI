@@ -9,7 +9,7 @@ const JWT_SECRET = env.JWT_SECRET as string;
 const ENCRYPTION_KEY = env.ENCRYPTION_KEY as string;
 const ENCRYPTION_IV = env.ENCRYPTION_IV as string;
 const COOKIE_NAME = 'session';
-const JWT_EXPIRES_IN = '1h'
+const JWT_EXPIRES_IN = '1h';
 
 // Encrypt data using AES-256-CBC
 function encryptData(data: string): string {
@@ -103,14 +103,14 @@ export async function refreshUserSession(cookies: Cookies): Promise<boolean> {
 		const response = await fetch('https://oauth2.googleapis.com/token', {
 			method: 'POST',
 			headers: {
-				'Content-Type': 'application/x-www-form-urlencoded',
+				'Content-Type': 'application/x-www-form-urlencoded'
 			},
 			body: new URLSearchParams({
 				client_id: env.GOOGLE_CLIENT_ID as string,
 				client_secret: env.GOOGLE_CLIENT_SECRET as string,
 				refresh_token: user.refreshToken,
-				grant_type: 'refresh_token',
-			}),
+				grant_type: 'refresh_token'
+			})
 		});
 
 		if (!response.ok) {
@@ -124,12 +124,21 @@ export async function refreshUserSession(cookies: Cookies): Promise<boolean> {
 		const updatedUser: UserSession = {
 			...user,
 			token: tokenData.access_token,
+			tokenExpiry: Date.now() + tokenData.expires_in * 1000
 		};
 
+		// Set updated user session in cookie
 		setAuthCookie(cookies, updatedUser);
 		return true;
 	} catch (error) {
-		console.error('Error refreshing token:', error);
+		console.error('Failed to refresh user session:', error);
 		return false;
 	}
+}
+
+// Check if token is expired or about to expire (within 5 minutes)
+export function isTokenExpired(user: UserSession | null): boolean {
+	if (!user || !user.tokenExpiry) return true;
+	const fiveMinutesFromNow = Date.now() + 5 * 60 * 1000;
+	return user.tokenExpiry < fiveMinutesFromNow;
 }

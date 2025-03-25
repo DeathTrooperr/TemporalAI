@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { calendarStore } from '../../../stores/calendarStore.js';
-	import { getEventsForDate, formatTime } from '../../../utils/dateUtils.js';
-	import { createStyleString } from '../../../utils/styleUtils.js';
+	import { getEventsForDate, formatTime } from '$lib/client/utils/dateUtils.js';
+	import { createStyleString } from '$lib/client/utils/styleUtils.js';
+	import { DateTime } from 'luxon';
 	import type { CalendarEvent } from '$lib/core/types/calendar.js';
 
 	export let events: CalendarEvent[] = [];
@@ -27,38 +28,64 @@
 
 	interface ProcessedEvent {
 		event: CalendarEvent;
+		normalizedStart: Date;
+		normalizedEnd: Date;
 		shiftLevel: number;
 	}
 
 	function processEvents(events: CalendarEvent[]): ProcessedEvent[] {
+		// Convert CalendarEvent to normalized format with JS Date objects
+		const normalizedEvents = events.map((event) => {
+			const startDateTime = event.start.dateTime
+				? DateTime.fromISO(event.start.dateTime).toJSDate()
+				: new Date(event.start.date || '');
+
+			const endDateTime = event.end.dateTime
+				? DateTime.fromISO(event.end.dateTime).toJSDate()
+				: new Date(event.end.date || '');
+
+			return {
+				event,
+				normalizedStart: startDateTime,
+				normalizedEnd: endDateTime,
+				shiftLevel: 0
+			};
+		});
+
 		// Sort events by start time (earlier first)
-		const sortedEvents = [...events].sort((a, b) => a.start.getTime() - b.start.getTime());
+		normalizedEvents.sort((a, b) => a.normalizedStart.getTime() - b.normalizedStart.getTime());
 
 		// Create an array to track events that significantly overlap and need shifting
 		const eventShifts = new Map<string, number>();
 		const eventHeights = new Map<string, number>();
 
 		// Initialize all events with no shifting and calculate heights
-		for (const event of sortedEvents) {
-			eventShifts.set(String(event.id), 0);
+		for (const eventData of normalizedEvents) {
+			eventShifts.set(String(eventData.event.id), 0);
 
 			// Calculate natural height based on event duration
-			const durationInHours = (event.end.getTime() - event.start.getTime()) / (1000 * 60 * 60);
+			const durationInHours =
+				(eventData.normalizedEnd.getTime() - eventData.normalizedStart.getTime()) /
+				(1000 * 60 * 60);
 			const naturalHeight = durationInHours * HOUR_HEIGHT;
-			eventHeights.set(String(event.id), Math.max(naturalHeight, DEFAULT_EVENT_MIN_HEIGHT));
+			eventHeights.set(
+				String(eventData.event.id),
+				Math.max(naturalHeight, DEFAULT_EVENT_MIN_HEIGHT)
+			);
 		}
 
 		// Track overlapping groups to manage shift levels
-		let currentGroup: CalendarEvent[] = [];
+		let currentGroup: ProcessedEvent[] = [];
 		let maxShiftInCurrentGroup = 0;
 
 		// Analyze each event's overlap with prior events
-		for (let i = 0; i < sortedEvents.length; i++) {
-			const currentEvent = sortedEvents[i];
+		for (let i = 0; i < normalizedEvents.length; i++) {
+			const currentEvent = normalizedEvents[i];
 
 			// Remove events from current group that don't overlap with current event
-			currentGroup = currentGroup.filter(groupEvent => {
-				const overlaps = groupEvent.end.getTime() > currentEvent.start.getTime();
+			currentGroup = currentGroup.filter((groupEvent) => {
+				const overlaps =
+					groupEvent.normalizedEnd.getTime() > currentEvent.normalizedStart.getTime();
 				if (!overlaps) {
 					maxShiftInCurrentGroup = Math.max(...[...eventShifts.values()]);
 				}
@@ -67,35 +94,36 @@
 
 			// If current event overlaps with any event in current group, increment shift
 			if (currentGroup.length > 0) {
-				eventShifts.set(String(currentEvent.id), currentGroup.length);
+				eventShifts.set(String(currentEvent.event.id), currentGroup.length);
 			} else {
 				// Start new group with no shift
-				eventShifts.set(String(currentEvent.id), 0);
+				eventShifts.set(String(currentEvent.event.id), 0);
 				maxShiftInCurrentGroup = 0;
 			}
 
 			currentGroup.push(currentEvent);
 		}
 
-		// Return processed events with position information
-		return sortedEvents.map(event => {
-			const shiftLevel = eventShifts.get(String(event.id)) || 0;
-			return { event, shiftLevel };
+		// Apply shift levels to normalized events
+		normalizedEvents.forEach((eventData) => {
+			eventData.shiftLevel = eventShifts.get(String(eventData.event.id)) || 0;
 		});
+
+		return normalizedEvents;
 	}
 
 	function getEventStyle(eventData: ProcessedEvent): string {
-		const { event, shiftLevel } = eventData;
-		const startHour = event.start.getHours();
-		const startMinute = event.start.getMinutes();
-		const endHour = event.end.getHours();
-		const endMinute = event.end.getMinutes();
+		const { event, normalizedStart, normalizedEnd, shiftLevel } = eventData;
+		const startHour = normalizedStart.getHours();
+		const startMinute = normalizedStart.getMinutes();
+		const endHour = normalizedEnd.getHours();
+		const endMinute = normalizedEnd.getMinutes();
 
 		// Calculate top position based on time
 		const top = (startHour + startMinute / 60) * HOUR_HEIGHT;
 
 		// Calculate height based on event duration
-		const durationInHours = ((endHour * 60 + endMinute) - (startHour * 60 + startMinute)) / 60;
+		const durationInHours = (endHour * 60 + endMinute - (startHour * 60 + startMinute)) / 60;
 		const baseHeight = durationInHours * HOUR_HEIGHT;
 
 		// Apply minimum height
@@ -161,9 +189,9 @@
 					class:event-card={true}
 					style={getEventStyle(eventData)}
 				>
-					<div class="truncate font-medium text-white">{eventData.event.title}</div>
+					<div class="truncate font-medium text-white">{eventData.event.summary}</div>
 					<div class="mt-1 truncate text-xs text-white opacity-80">
-						{formatTime(eventData.event.start)} - {formatTime(eventData.event.end)}
+						{formatTime(eventData.normalizedStart)} - {formatTime(eventData.normalizedEnd)}
 					</div>
 				</div>
 			{/each}
@@ -172,12 +200,14 @@
 </div>
 
 <style>
-    .event-card {
-        box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
-        box-sizing: border-box;
-    }
+	.event-card {
+		box-shadow:
+			0 1px 3px rgba(0, 0, 0, 0.12),
+			0 1px 2px rgba(0, 0, 0, 0.24);
+		box-sizing: border-box;
+	}
 
-    .event-card > div {
-        line-height: 1.4;
-    }
+	.event-card > div {
+		line-height: 1.4;
+	}
 </style>

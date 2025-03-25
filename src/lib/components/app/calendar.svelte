@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { getInitialEvents } from '../../data/events.js';
-	import type { CalendarEvent } from '$lib/core/types/calendar.js';
+	import { onDestroy, onMount } from 'svelte';
+	import type { GoogleCalendarEvent } from '$lib/core/interfaces/calendarInterfaces.js';
 
 	import CalendarHeader from '$lib/components/app/calendar/calendarHeader.svelte';
 	import MonthView from '$lib/components/app/calendar/monthView.svelte';
@@ -11,13 +10,29 @@
 
 	$: view = $calendarStore.currentView;
 	$: date = $calendarStore.currentDate;
+	$: year = $calendarStore.currentYear;
+	$: events = $calendarStore.events;
 
-	// Events
-	let events: CalendarEvent[] = [];
+	let eventInterval: NodeJS.Timeout;
+
+	async function refreshEvents() {
+		try {
+			const response = await fetch(`/api/calendar/?year:${year}`);
+			if (response.ok) {
+				events = await response.json();
+				console.log(events);
+			}
+		} catch (error) {
+			console.error('Failed to fetch events:', error);
+		}
+	}
 
 	onMount(() => {
-		events = getInitialEvents($calendarStore.currentYear, $calendarStore.currentMonth);
+		refreshEvents();
+		eventInterval = setInterval(refreshEvents, 1000 * 60);
 	});
+
+	onDestroy(() => clearInterval(eventInterval));
 </script>
 
 <div
