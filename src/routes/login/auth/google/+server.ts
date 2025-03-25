@@ -64,7 +64,7 @@ export async function GET({ url, cookies }) {
 		};
 
 		// Step 5: Set auth cookie
-		setAuthCookie(cookies, user);
+		await setAuthCookie(cookies, user);
 	} catch (error) {
 		console.error('Failed to authenticate with Google');
 		console.error('Error:', error);

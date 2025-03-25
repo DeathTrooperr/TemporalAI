@@ -6,6 +6,7 @@
 	import { goto } from '$app/navigation';
 
 	type User = {
+		id: string;
 		name: string;
 		email: string;
 		picture: string;
@@ -243,7 +244,7 @@
 					class="col-span-2 h-full overflow-hidden rounded-lg border border-white/10 bg-gray-900/80 shadow-2xl backdrop-blur-md"
 				>
 					<div class="h-full overflow-auto">
-						<Calendar />
+						<Calendar {user} />
 					</div>
 				</div>
 
@@ -263,7 +264,7 @@
 						class="flex-grow overflow-hidden rounded-lg border border-white/10 bg-gray-900/80 shadow-2xl backdrop-blur-md"
 					>
 						<div class="h-full overflow-auto">
-							<Calendar />
+							<Calendar {user} />
 						</div>
 					</div>
 				{/if}

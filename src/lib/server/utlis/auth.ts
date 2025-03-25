@@ -3,33 +3,72 @@ import { env } from '$env/dynamic/private';
 import type { UserSession } from '$lib/core/interfaces/userSession.js';
 import type { Cookies } from '@sveltejs/kit';
 import { DEV } from 'esm-env';
-import crypto from 'crypto';
 
 const JWT_SECRET = env.JWT_SECRET as string;
 const ENCRYPTION_KEY = env.ENCRYPTION_KEY as string;
 const ENCRYPTION_IV = env.ENCRYPTION_IV as string;
 const COOKIE_NAME = 'session';
-const JWT_EXPIRES_IN = '1h'
+const JWT_EXPIRES_IN = '1h';
 
-// Encrypt data using AES-256-CBC
-function encryptData(data: string): string {
-	const iv = Buffer.from(ENCRYPTION_IV, 'hex');
-	const key = Buffer.from(ENCRYPTION_KEY, 'hex');
-	const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-	let encrypted = cipher.update(data, 'utf8', 'base64');
-	encrypted += cipher.final('base64');
-	return encrypted;
+// Helper function to convert hex string to Uint8Array
+function hexToUint8Array(hexString: string): Uint8Array {
+	return new Uint8Array(hexString.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
 }
 
-// Decrypt data using AES-256-CBC
-function decryptData(encryptedData: string): string {
+// Helper function to convert string to Uint8Array
+function stringToUint8Array(str: string): Uint8Array {
+	return new TextEncoder().encode(str);
+}
+
+// Helper function to convert Uint8Array to string
+function uint8ArrayToString(array: Uint8Array): string {
+	return new TextDecoder().decode(array);
+}
+
+// Encrypt data using AES-GCM (Web Crypto API)
+async function encryptData(data: string): Promise<string> {
+	const iv = hexToUint8Array(ENCRYPTION_IV);
+	const key = await crypto.subtle.importKey(
+		'raw',
+		hexToUint8Array(ENCRYPTION_KEY),
+		{ name: 'AES-GCM' },
+		false,
+		['encrypt']
+	);
+
+	const encodedData = stringToUint8Array(data);
+	const encryptedBuffer = await crypto.subtle.encrypt(
+		{ name: 'AES-GCM', iv },
+		key,
+		encodedData
+	);
+
+	// Convert encrypted buffer to base64
+	return btoa(String.fromCharCode(...new Uint8Array(encryptedBuffer)));
+}
+
+// Decrypt data using AES-GCM (Web Crypto API)
+async function decryptData(encryptedData: string): Promise<string> {
 	try {
-		const iv = Buffer.from(ENCRYPTION_IV, 'hex');
-		const key = Buffer.from(ENCRYPTION_KEY, 'hex');
-		const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-		let decrypted = decipher.update(encryptedData, 'base64', 'utf8');
-		decrypted += decipher.final('utf8');
-		return decrypted;
+		const iv = hexToUint8Array(ENCRYPTION_IV);
+		const key = await crypto.subtle.importKey(
+			'raw',
+			hexToUint8Array(ENCRYPTION_KEY),
+			{ name: 'AES-GCM' },
+			false,
+			['decrypt']
+		);
+
+		// Convert base64 to array buffer
+		const encryptedBytes = Uint8Array.from(atob(encryptedData), c => c.charCodeAt(0));
+
+		const decryptedBuffer = await crypto.subtle.decrypt(
+			{ name: 'AES-GCM', iv },
+			key,
+			encryptedBytes
+		);
+
+		return uint8ArrayToString(new Uint8Array(decryptedBuffer));
 	} catch (error) {
 		console.error('Decryption error:', error);
 		throw new Error('Failed to decrypt data');
@@ -37,15 +76,15 @@ function decryptData(encryptedData: string): string {
 }
 
 // Create JWT token - first sign, then encrypt
-export function createToken(user: UserSession): string {
+export async function createToken(user: UserSession): Promise<string> {
 	const signedToken = jwt.sign(user, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-	return encryptData(signedToken);
+	return await encryptData(signedToken);
 }
 
 // Verify JWT token - first decrypt, then verify
-export function verifyToken(encryptedToken: string): UserSession | null {
+export async function verifyToken(encryptedToken: string): Promise<UserSession | null> {
 	try {
-		const token = decryptData(encryptedToken);
+		const token = await decryptData(encryptedToken);
 		const decoded = jwt.verify(token, JWT_SECRET) as UserSession;
 		if (!isValidUserSession(decoded)) return null;
 		return decoded;
@@ -61,8 +100,8 @@ function isValidUserSession(obj: any): obj is UserSession {
 }
 
 // Set auth cookie with improved typing
-export function setAuthCookie(cookies: Cookies, user: UserSession): void {
-	const token = createToken(user);
+export async function setAuthCookie(cookies: Cookies, user: UserSession): Promise<void> {
+	const token = await createToken(user);
 	cookies.set(COOKIE_NAME, token, {
 		path: '/',
 		httpOnly: true,
@@ -78,10 +117,10 @@ export function clearAuthCookie(cookies: Cookies): void {
 }
 
 // Get user from cookies with improved typing
-export function getUserFromCookies(cookies: Cookies): UserSession | null {
+export async function getUserFromCookies(cookies: Cookies): Promise<UserSession | null> {
 	const encryptedToken = cookies.get(COOKIE_NAME);
 	if (!encryptedToken) return null;
-	return verifyToken(encryptedToken);
+	return await verifyToken(encryptedToken);
 }
 
 // Request a new token from Google's token API using refresh token
@@ -90,7 +129,7 @@ export async function refreshUserSession(cookies: Cookies): Promise<boolean> {
 		const encryptedToken = cookies.get(COOKIE_NAME);
 		if (!encryptedToken) return false;
 
-		const token = decryptData(encryptedToken);
+		const token = await decryptData(encryptedToken);
 		const payload = jwt.verify(token, JWT_SECRET) as JwtPayload;
 
 		if (!isValidUserSession(payload)) return false;
@@ -103,14 +142,14 @@ export async function refreshUserSession(cookies: Cookies): Promise<boolean> {
 		const response = await fetch('https://oauth2.googleapis.com/token', {
 			method: 'POST',
 			headers: {
-				'Content-Type': 'application/x-www-form-urlencoded',
+				'Content-Type': 'application/x-www-form-urlencoded'
 			},
 			body: new URLSearchParams({
 				client_id: env.GOOGLE_CLIENT_ID as string,
 				client_secret: env.GOOGLE_CLIENT_SECRET as string,
 				refresh_token: user.refreshToken,
-				grant_type: 'refresh_token',
-			}),
+				grant_type: 'refresh_token'
+			})
 		});
 
 		if (!response.ok) {
@@ -126,10 +165,11 @@ export async function refreshUserSession(cookies: Cookies): Promise<boolean> {
 			token: tokenData.access_token,
 		};
 
-		setAuthCookie(cookies, updatedUser);
+		// Set updated user session in cookie
+		await setAuthCookie(cookies, updatedUser);
 		return true;
 	} catch (error) {
-		console.error('Error refreshing token:', error);
+		console.error('Failed to refresh user session:', error);
 		return false;
 	}
 }

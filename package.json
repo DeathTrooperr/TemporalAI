@@ -67,11 +67,9 @@
 	],
 	"dependencies": {
 		"esm-env": "^1.2.2",
-		"googleapis": "^148.0.0",
 		"jsonwebtoken": "^9.0.2",
 		"luxon": "^3.5.0",
-		"openai": "^4.89.0",
-		"svelte-transition": "^0.0.17"
+		"openai": "^4.89.0"
 	},
 	"engines": {
 		"node": ">=18.18.0"
