@@ -45,6 +45,12 @@ Or open in a browser tab automatically:
    npm run dev -- --open
 ```
 
+## Login Instructions
+
+1. Select the Google account you want to sign in with
+2. You will get a message similar to "Google hasn’t verified this app". Click "Advanced", then "Go to temporalai.pages.dev (unsafe)"
+3. Click "Continue" twice to allow Temporal AI access to your Google Calendar.
+
 ## User Input Guidelines
 
 Events should have a distinct name. For example, don't just say "meeting", specify what kind of meeting it is.
