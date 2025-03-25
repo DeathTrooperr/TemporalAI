@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import type { GoogleCalendarEvent } from '$lib/core/interfaces/calendarInterfaces.js';
 
 	import CalendarHeader from '$lib/components/app/calendar/calendarHeader.svelte';
 	import MonthView from '$lib/components/app/calendar/monthView.svelte';
@@ -19,7 +18,7 @@
 		try {
 			const response = await fetch(`/api/calendar/?year:${year}`);
 			if (response.ok) {
-				events = await response.json();
+			  calendarStore.updateEvents(await response.json());
 				console.log(events);
 			}
 		} catch (error) {

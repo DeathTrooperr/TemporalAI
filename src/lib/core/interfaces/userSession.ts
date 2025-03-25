@@ -5,5 +5,4 @@ export interface UserSession {
 	picture: string;
 	token: string;
 	refreshToken: string;
-	tokenExpiry: number;
 }

@@ -163,7 +163,6 @@ export async function refreshUserSession(cookies: Cookies): Promise<boolean> {
 		const updatedUser: UserSession = {
 			...user,
 			token: tokenData.access_token,
-			tokenExpiry: Date.now() + tokenData.expires_in * 1000
 		};
 
 		// Set updated user session in cookie
@@ -173,11 +172,4 @@ export async function refreshUserSession(cookies: Cookies): Promise<boolean> {
 		console.error('Failed to refresh user session:', error);
 		return false;
 	}
-}
-
-// Check if token is expired or about to expire (within 5 minutes)
-export function isTokenExpired(user: UserSession | null): boolean {
-	if (!user || !user.tokenExpiry) return true;
-	const fiveMinutesFromNow = Date.now() + 5 * 60 * 1000;
-	return user.tokenExpiry < fiveMinutesFromNow;
 }

@@ -1,11 +1,10 @@
 <script lang="ts">
 	import { calendarStore } from '../../../stores/calendarStore.js';
 	import { getEventsForDate, formatTime } from '$lib/client/utils/dateUtils.js';
-	import { createStyleString } from '$lib/client/utils/styleUtils.js';
 	import { DateTime } from 'luxon';
-	import type { CalendarEvent } from '$lib/core/types/calendar.js';
-
-	export let events: CalendarEvent[] = [];
+	import type { GoogleCalendarEvent } from '$lib/core/interfaces/calendarInterfaces.js';
+	import { getEventColor } from '$lib/client/utils/styleUtils.js';
+	export let events: GoogleCalendarEvent[] = [];
 
 	// Default height for an event with title and time
 	const DEFAULT_EVENT_MIN_HEIGHT = 84; // 64px + 20px extra
@@ -27,13 +26,13 @@
 	$: processedEvents = processEvents(dayEvents);
 
 	interface ProcessedEvent {
-		event: CalendarEvent;
+		event: GoogleCalendarEvent;
 		normalizedStart: Date;
 		normalizedEnd: Date;
 		shiftLevel: number;
 	}
 
-	function processEvents(events: CalendarEvent[]): ProcessedEvent[] {
+	function processEvents(events: GoogleCalendarEvent[]): ProcessedEvent[] {
 		// Convert CalendarEvent to normalized format with JS Date objects
 		const normalizedEvents = events.map((event) => {
 			const startDateTime = event.start.dateTime
@@ -148,7 +147,7 @@
 		return `
 			top: ${top}px;
 			height: ${height}px;
-			background-color: ${event.color};
+			background-color: ${getEventColor("timeAuto", normalizedStart.getDate())};
 			width: ${width};
 			left: ${left};
 			z-index: ${zIndex};

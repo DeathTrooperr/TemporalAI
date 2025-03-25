@@ -66,7 +66,7 @@
 					{#each dateEvents as event (event.id)}
 						<div
 							class="event bg-opacity-20 truncate rounded p-1 text-xs"
-							style={`background-color: ${getEventColor(event.color)}; opacity: 0.8;`}
+							style={`background-color: ${getEventColor("timeAuto", new Date(event.start))}; opacity: 0.8;`}
 						>
 							<span class="font-medium text-white">{event.summary}</span>
 						</div>
