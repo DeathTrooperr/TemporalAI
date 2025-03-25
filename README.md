@@ -70,6 +70,16 @@ Events should have a distinct name. For example, don't just say "meeting", speci
 - Format: &lt;action&gt; &lt;event_name&gt; &lt;attendees&gt; &lt;NEW time of event&gt;
 - Example: "Reschedule my project planning meeting with John to 4 PM tomorrow."
 
+## Our vision
+
+Some key enhancements we've slated for future development:
+
+- **Handle more input variety**: Improve the AI's ability to understand and process a wider range of natural language inputs
+- **Handling events with the same names but different dates/times**: Enhance the system to manage events that have identical names but occur at different times or dates
+- **UI improvements**: Continously refine the UI to be more intuitive and user-friendly
+- **More mobile friendly**: Focus on making the app more responsive and usable on mobile devices
+- **Integrate classic calendar features**: Add traditional calendar functionalities like clicking into events to view or edit details
+
 ## Building for Production
 
 To build the application for production:
