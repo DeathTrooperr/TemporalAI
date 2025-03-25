@@ -9,7 +9,7 @@ enabled = true
 
 # Environment Variables - Non-sensitive
 [vars]
-REDIRECT_URI = "http://localhost:5173/login/auth/google"
+REDIRECT_URI = "https://temporalai.pages.dev/login/auth/google"
 GOOGLE_CLIENT_ID = "677162306222-ajunrqqqtn902hurs20opuu5lfradcpp.apps.googleusercontent.com"
 
 # Secret Environment Variables
