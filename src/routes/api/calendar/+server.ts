@@ -62,7 +62,7 @@ interface User {
 }
 
 export async function GET({ url, cookies }): Promise<Response> {
-	const user: UserSession | null = getUserFromCookies(cookies);
+	const user: UserSession | null = await getUserFromCookies(cookies);
 
 	if (!user) {
 		return json({ error: 'Unauthorized' }, { status: 401 });

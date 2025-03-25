@@ -9,7 +9,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const path = url.pathname;
 
 	// Get user from cookies
-	const user = getUserFromCookies(event.cookies);
+	const user = await getUserFromCookies(event.cookies);
 
 	// Special handling for login and logout
 	if (path === '/login' && user) {

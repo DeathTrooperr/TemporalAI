@@ -618,7 +618,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		if (!message || typeof message !== 'string') {
 			return json({ error: 'Invalid request format' }, { status: 400 });
 		}
-		const user = getUserFromCookies(cookies);
+		const user = await getUserFromCookies(cookies);
 		if (!user?.token) {
 			return json({ error: 'Google Calendar authentication required' }, { status: 401 });
 		}
